@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"log"
+	"github.com/nathankerr/pdf/file"
 )
 
 func main() {
@@ -14,12 +15,15 @@ func main() {
 
 	filename := os.Args[1]
 
-	log.Println(filename)
+	pdf, err := file.Open(filename)
+	if err != nil {
+		log.Fatalln(filename, err)
+	}
 
-	// file, err := pdf.Open(filename)
-	// if err != nil {
-	// 	log.Fatalln(filename, err)
-	// }
+	err = pdf.Close()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	// log.Println(file)
+	log.Println(pdf)
 }
