@@ -1,7 +1,3 @@
-all: pdf.leg.go
-	go install github.com/nathankerr/pdf
-	go install github.com/nathankerr/pdf/pdf
+all:
+	go install -a github.com/nathankerr/pdf
 	pdf PDF32000_2008.pdf
-
-%.leg.go: %.leg
-	leg $< > $@

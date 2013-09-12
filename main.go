@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/nathankerr/pdf"
 	"os"
 	"log"
 )
@@ -15,10 +14,12 @@ func main() {
 
 	filename := os.Args[1]
 
-	file, err := pdf.Open(filename)
-	if err != nil {
-		log.Fatalln(filename, err)
-	}
+	log.Println(filename)
 
-	log.Println(file)
+	// file, err := pdf.Open(filename)
+	// if err != nil {
+	// 	log.Fatalln(filename, err)
+	// }
+
+	// log.Println(file)
 }
