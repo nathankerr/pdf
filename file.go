@@ -8,7 +8,7 @@ type File []FileObject
 type FileObject interface{}
 
 // 7.5.2 File Header
-type Header []byte
+type Header string
 
 // 7.5.3 File Body
 type Body []BodyObject
