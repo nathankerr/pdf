@@ -1,9 +1,9 @@
 package main
 
 import (
-	"os"
-	"log"
 	"github.com/nathankerr/pdf/file"
+	"log"
+	"os"
 )
 
 func main() {
