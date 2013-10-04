@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/edsrzf/mmap-go"
 	"os"
-	"strconv"
 )
 
 type File struct {
@@ -35,37 +34,10 @@ func Open(filename string) (*File, error) {
 		return nil, errors.New("file does not have PDF header")
 	}
 
-	// check ending
-	eofOffset := bytes.LastIndex(file.mmap, []byte("%%EOF"))
-	if eofOffset == -1 {
-		return nil, errors.New("file does not have PDF ending")
-	}
-
-	// find last startxref
-	startxrefOffset := bytes.LastIndex(file.mmap, []byte("startxref"))
-	if startxrefOffset == -1 {
-		return nil, errors.New("could not find startxref")
-	}
-
-	digits := "0123456789"
-	xrefStart := bytes.IndexAny(file.mmap[startxrefOffset:], digits)
-	if xrefStart == -1 {
-		return nil, errors.New("could not find beginning of startxref reference")
-	}
-	xrefStart += startxrefOffset
-	xrefEnd := bytes.LastIndexAny(file.mmap[xrefStart:eofOffset], digits)
-	if xrefEnd == -1 {
-		return nil, errors.New("could not find end of startxref reference")
-	}
-	xrefEnd += xrefStart + 1
-
-	xrefOffset, err := strconv.ParseUint(string(file.mmap[xrefStart:xrefEnd]), 10, 64)
+	err = file.loadReferences()
 	if err != nil {
 		return nil, err
 	}
-
-	println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)
-	println(string(file.mmap[xrefOffset : xrefOffset+200]))
 
 	return file, nil
 }
