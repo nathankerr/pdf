@@ -73,6 +73,7 @@ func ParseIndirectObject(slice []byte) (*IndirectObject, error) {
 	case '(':
 		// String §7.3.4
 		println("Literal String")
+		io.Object, err = ParseLiteralString(slice[start:])
 	case '/':
 		// Name §7.3.5
 		println("Name")
@@ -154,4 +155,26 @@ func match(slice []byte, toMatch string) (int, bool) {
 	}
 
 	return start + len(toMatch), true
+}
+
+func index(slice []byte, toFind byte) (int, bool) {
+	for i := 0; i < len(slice); i++ {
+		if slice[i] == toFind {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+func ParseLiteralString(slice []byte) (String, error) {
+	if slice[0] != '(' {
+		return nil, errors.New("not a literal string")
+	}
+
+	endParen, ok := index(slice, ')')
+	if !ok {
+		return nil, errors.New("couldn't find end of string")
+	}
+
+	return slice[1:endParen], nil
 }

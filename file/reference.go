@@ -38,9 +38,18 @@ func (file *File) loadReferences() error {
 		return err
 	}
 
-	_, err = ParseIndirectObject(file.mmap[xrefOffset:eofOffset])
-	if err != nil {
-		return err
+	switch file.mmap[xrefOffset] {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		// indirect object
+		_, err = ParseIndirectObject(file.mmap[xrefOffset:eofOffset])
+		if err != nil {
+			return err
+		}
+	case 'x':
+		// xref table
+		println("xref table")
+	default:
+		panic(file.mmap[xrefOffset])
 	}
 
 	// println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)

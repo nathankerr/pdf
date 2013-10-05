@@ -31,3 +31,29 @@ func TestIndirectObjectsExample1(t *testing.T) {
 		t.Error("Example1", err)
 	}
 }
+
+// §7.3.4.2 Example 1
+func TestLiteralStringExample1(t *testing.T) {
+	strings := [][]byte{
+		[]byte("(This is a string)"),
+		[]byte("(Strings may contain newlines\nand such.)"),
+		[]byte("(Strings may contain balanced parentheses () and\nspecial characters (*!&}^% and so on).)"),
+		[]byte("(The following is an empty string.)"),
+		[]byte("()"),
+		[]byte("(It has zero (0) length.)"),
+	}
+
+	for n, slice := range strings {
+		str, err := ParseLiteralString(slice)
+		if err != nil {
+			t.Error(n, err)
+		}
+
+		// should work because the test cases are encoded as Go strings...
+		err = compare(str, String(slice[1:len(slice)-1]))
+		if err != nil {
+			t.Error(n, err)
+		}
+	}
+
+}
