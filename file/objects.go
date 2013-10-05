@@ -172,15 +172,33 @@ func ParseLiteralString(slice []byte) (String, error) {
 	}
 
 	parens := 0
+	decoded := make([]byte, len(slice))
+	decodedIndex := 0
 	for i := 0; i < len(slice); i++ {
+		include := true
 		switch slice[i] {
 		case '(':
+			if parens == 0 {
+				include = false
+			}
 			parens++
 		case ')':
 			parens--
 			if parens == 0 {
-				return slice[1:i], nil
+				return decoded[:decodedIndex], nil
+			} else {
+				include = true
 			}
+		case '\n':
+			if slice[i-1] == '\\' {
+				decodedIndex--
+				include = false
+			}
+		}
+
+		if include {
+			decoded[decodedIndex] = slice[i]
+			decodedIndex++
 		}
 	}
 

@@ -57,3 +57,21 @@ func TestLiteralStringExample1(t *testing.T) {
 	}
 
 }
+
+// §7.3.4.2 Example 2
+func TestLiteralStringExample2(t *testing.T) {
+	first, err := ParseLiteralString([]byte("(These \\\ntwo strings \\\nare the same.)"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	second, err := ParseLiteralString([]byte("(These two strings are the same.)"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = compare(first, second)
+	if err != nil {
+		t.Error(err)
+	}
+}
