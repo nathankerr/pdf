@@ -110,3 +110,119 @@ func TestLiteralStringExamples345(t *testing.T) {
 		}
 	}
 }
+
+//§7.3.7 Example
+func DISABLEDTestDictionaryExample(t *testing.T) {
+	literal := []byte(`<< /Type /Example
+/Subtype /DictionaryExample
+/Version 0.01
+/Integeritem 12
+/StringItem (a string)
+/Subdictionary << /Item1 0.4
+				  /Item2 true
+				  /LastItem (not!)
+				  /VeryLastItem (OK)
+			   >>
+>>`)
+
+	dict, length, err := ParseDictionary(literal)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if length != len(literal) {
+		t.Error("expected ", len(literal), ", got ", length)
+	}
+
+	err = compare(dict, Dictionary{
+		Name("Type"):        Name("/Example"),
+		Name("Subtype"):     Name("DictionaryExample"),
+		Name("Version"):     Real(0.01),
+		Name("Integeritem"): Integer(12),
+		Name("StringItem"):  String("a string"),
+		Name("Subdictionary"): Dictionary{
+			Name("Item1"):        Real(0.4),
+			Name("Item2"):        Boolean(true),
+			Name("LastItem"):     String("not!"),
+			Name("VeryLastItem"): String("OK"),
+		},
+	})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+//§7.3.5 Table 4
+func TestNameExamples(t *testing.T) {
+	type test struct {
+		literal []byte
+		name    Name
+	}
+
+	tests := []test{
+		test{
+			literal: []byte("/Name1"),
+			name:    Name("Name1"),
+		},
+		test{
+			literal: []byte("/ASomewhatLongerName"),
+			name:    Name("ASomewhatLongerName"),
+		},
+		test{
+			literal: []byte("/A;Name_With-Various***Characters?"),
+			name:    Name("A;Name_With-Various***Characters?"),
+		},
+		test{
+			literal: []byte("/1.2"),
+			name:    Name("1.2"),
+		},
+		test{
+			literal: []byte("/$$"),
+			name:    Name("$$"),
+		},
+		test{
+			literal: []byte("/@pattern"),
+			name:    Name("@pattern"),
+		},
+		test{
+			literal: []byte("/.notdef"),
+			name:    Name(".notdef"),
+		},
+		test{
+			// this example as defined would not work as
+			// the capitalization of "lime" was different
+			// in the literal and the result
+			// Fixed by making consistent
+			literal: []byte("/Lime#20Green"),
+			name:    Name("Lime Green"),
+		},
+		test{
+			literal: []byte("/paired#28#29parentheses"),
+			name:    Name("paired()parentheses"),
+		},
+		test{
+			literal: []byte("/The_Key_of_F#23_Minor"),
+			name:    Name("The_Key_of_F#_Minor"),
+		},
+		test{
+			literal: []byte("/A#42"),
+			name:    Name("AB"),
+		},
+	}
+
+	for n, test := range tests {
+		name, length, err := ParseName(test.literal)
+		if err != nil {
+			t.Error(n, err)
+		}
+
+		if length != len(test.literal) {
+			t.Error("expected length of", len(test.literal), "got", length)
+		}
+
+		err = compare(name, test.name)
+		if err != nil {
+			t.Error(n, err)
+		}
+	}
+}

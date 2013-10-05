@@ -17,7 +17,18 @@ import (
 - Null §7.3.9
 */
 type Object interface{}
+type Boolean bool
+type Integer int
+type Real float64
 type String []byte
+type Name string
+type Array []Object
+type Dictionary map[Name]Object
+type Stream struct {
+	Dictionary
+	Stream []byte
+}
+type Null struct{} // value here does not mean anything
 
 type IndirectObject struct {
 	ObjectNumber     uint64
@@ -142,6 +153,16 @@ func nextNonWhitespace(slice []byte) (int, bool) {
 	return -1, false
 }
 
+func nextWhitespace(slice []byte) (int, bool) {
+	for i := 0; i < len(slice); i++ {
+		switch slice[i] {
+		case 0, 9, 10, 12, 13, 32: // whitespace
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 func match(slice []byte, toMatch string) (int, bool) {
 	start, ok := nextNonWhitespace(slice)
 	if !ok {
@@ -203,4 +224,48 @@ func ParseLiteralString(slice []byte) (String, error) {
 	}
 
 	return nil, errors.New("couldn't find end of string")
+}
+
+// returned int is the length of slice consumed
+func ParseDictionary(slice []byte) (Dictionary, int, error) {
+	if slice[0] != '<' && slice[1] != '<' {
+		return nil, 0, errors.New("not a dictionary")
+	}
+
+	dict := make(Dictionary)
+
+	i := 2
+	for i < len(slice) {
+		n, ok := nextNonWhitespace(slice[i:])
+		if !ok {
+			return nil, 0, errors.New("expected a non-whitespace char")
+		}
+		i += n
+
+		// _, n, err := ParseName(slice[i:])
+		// if err != nil {
+		// 	return nil, 0, err
+		// }
+
+		// TODO parse next stuff
+
+		i++
+	}
+
+	return dict, i, nil
+}
+
+func ParseName(slice []byte) (Name, int, error) {
+	if slice[0] != '/' {
+		return Name(""), 0, errors.New("not a name")
+	}
+
+	end, ok := nextWhitespace(slice[1:])
+	if !ok {
+		end = len(slice)
+	}
+
+	name := slice[1:end]
+
+	return Name(name), end, nil
 }
