@@ -171,10 +171,18 @@ func ParseLiteralString(slice []byte) (String, error) {
 		return nil, errors.New("not a literal string")
 	}
 
-	endParen, ok := index(slice, ')')
-	if !ok {
-		return nil, errors.New("couldn't find end of string")
+	parens := 0
+	for i := 0; i < len(slice); i++ {
+		switch slice[i] {
+		case '(':
+			parens++
+		case ')':
+			parens--
+			if parens == 0 {
+				return slice[1:i], nil
+			}
+		}
 	}
 
-	return slice[1:endParen], nil
+	return nil, errors.New("couldn't find end of string")
 }
