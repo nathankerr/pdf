@@ -75,3 +75,38 @@ func TestLiteralStringExample2(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// §7.3.4.2 Examples 3, 4, 5
+// These examples deal with how pdf strings should
+// be interpreted. There is nothing in the spec that
+// says that an string with escaped characters which
+// is then interpreted is equivalent to one without
+// escaping those characters (with the exeption in
+// Example 2). These examples are included for
+// completeness.
+func TestLiteralStringExamples345(t *testing.T) {
+	strings := [][]byte{
+		// Example 3
+		[]byte("(This string has an end-of-line at the end of it.\n)"),
+		[]byte("(So does this one.\n)"),
+		// Example 4
+		[]byte("(This string contains \\245two octal characters\\307.)"),
+		// Example 5
+		[]byte("(\\0053)"),
+		[]byte("(\\053)"),
+		[]byte("(\\53)"),
+	}
+
+	for n, slice := range strings {
+		str, err := ParseLiteralString(slice)
+		if err != nil {
+			t.Error(n, err)
+		}
+
+		// should work because the test cases are encoded as Go strings...
+		err = compare(str, String(slice[1:len(slice)-1]))
+		if err != nil {
+			t.Error(n, err)
+		}
+	}
+}
