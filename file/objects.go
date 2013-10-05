@@ -260,12 +260,25 @@ func ParseName(slice []byte) (Name, int, error) {
 		return Name(""), 0, errors.New("not a name")
 	}
 
-	end, ok := nextWhitespace(slice[1:])
-	if !ok {
-		end = len(slice)
+	name := make([]byte, 0, len(slice))
+
+	i := 1
+	for i < len(slice) {
+		switch slice[i] {
+		case 0, 9, 10, 12, 13, 32: // whitespace
+			break
+		case '#':
+			char, err := strconv.ParseUint(string(slice[i+1:i+3]), 16, 8)
+			if err != nil {
+				return Name(""), 0, err
+			}
+			name = append(name, byte(char))
+			i += 2
+		default:
+			name = append(name, slice[i])
+		}
+		i++
 	}
 
-	name := slice[1:end]
-
-	return Name(name), end, nil
+	return Name(name), i, nil
 }
