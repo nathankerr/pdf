@@ -85,7 +85,6 @@ func ParseIndirectObject(slice []byte) (*IndirectObject, error) {
 		println("Numeric")
 	case '(':
 		// String §7.3.4
-		println("Literal String")
 		io.Object, n, err = ParseLiteralString(slice[start:])
 		start += n
 	case '/':
@@ -230,7 +229,7 @@ func ParseLiteralString(slice []byte) (Object, int, error) {
 }
 
 // returned int is the length of slice consumed
-func ParseDictionary(slice []byte) (Dictionary, int, error) {
+func ParseDictionary(slice []byte) (Object, int, error) {
 	if slice[0] != '<' && slice[1] != '<' {
 		return nil, 0, errors.New("not a dictionary")
 	}
@@ -239,20 +238,40 @@ func ParseDictionary(slice []byte) (Dictionary, int, error) {
 
 	i := 2
 	for i < len(slice) {
+		// skip whitespace
 		n, ok := nextNonWhitespace(slice[i:])
 		if !ok {
 			return nil, 0, errors.New("expected a non-whitespace char")
 		}
 		i += n
 
-		// _, n, err := ParseName(slice[i:])
-		// if err != nil {
-		// 	return nil, 0, err
-		// }
+		// check to see if end
+		if slice[i] == '>' && slice[i+1] == '>' {
+			i += 2
+			break
+		}
 
-		// TODO parse next stuff
+		// get the key
+		name, n, err := ParseName(slice[i:])
+		if err != nil {
+			return nil, 0, err
+		}
+		i += n
 
-		i++
+		key, ok := name.(Name)
+		if !ok {
+			return nil, 0, errors.New("unable to cast Name")
+		}
+
+		// get the value
+		value, n, err := ParseObject(slice[i:])
+		if err != nil {
+			return nil, 0, err
+		}
+		i += n
+
+		// set the key/value pair
+		dict[key] = value
 	}
 
 	return dict, i, nil
@@ -269,7 +288,7 @@ func ParseName(slice []byte) (Object, int, error) {
 	for i < len(slice) {
 		switch slice[i] {
 		case 0, 9, 10, 12, 13, 32: // whitespace
-			break
+			return Name(name), i, nil
 		case '#':
 			char, err := strconv.ParseUint(string(slice[i+1:i+3]), 16, 8)
 			if err != nil {
@@ -375,4 +394,56 @@ func isHexDigit(char byte) bool {
 		return true
 	}
 	return false
+}
+
+func ParseObject(slice []byte) (Object, int, error) {
+	start, ok := nextNonWhitespace(slice)
+	if !ok {
+		return nil, 0, errors.New("expected a non-whitespace char")
+	}
+
+	var parser parseFn
+
+	println("\t" + string(slice[start:]))
+
+	// determine the object type
+	// except for Stream §7.3.8
+	// streams start as dictionaries
+	switch slice[start] {
+	case 't', 'f':
+		// Boolean §7.3.2
+		parser = ParseBoolean
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-':
+		// Integer §7.3.3
+		// Real §7.3.3
+		parser = ParseNumeric
+	case '(':
+		// String §7.3.4
+		parser = ParseLiteralString
+	case '/':
+		// Name §7.3.5
+		parser = ParseName
+	case '[':
+		// Array §7.3.6
+		println("TODO: array")
+		// parser = ParseArray
+	case '<':
+		if slice[start+1] == '<' {
+			// Dictionary §7.3.7
+			parser = ParseDictionary
+		} else {
+			// String §7.3.4
+			parser = ParseHexadecimalString
+		}
+	case 'n':
+		// Null §7.3.9
+		println("TODO: Null")
+		// parser = ParseNull
+	default:
+		panic(string(slice[start]))
+	}
+
+	object, n, err := parser(slice[start:])
+
+	return object, start + n, err
 }

@@ -153,7 +153,7 @@ func TestLiteralStringExamples345(t *testing.T) {
 }
 
 //§7.3.7 Example
-func DISABLEDTestDictionaryExample(t *testing.T) {
+func TestDictionaryExample(t *testing.T) {
 	literal := []byte(`<< /Type /Example
 /Subtype /DictionaryExample
 /Version 0.01
@@ -176,7 +176,7 @@ func DISABLEDTestDictionaryExample(t *testing.T) {
 	}
 
 	err = compare(dict, Dictionary{
-		Name("Type"):        Name("/Example"),
+		Name("Type"):        Name("Example"),
 		Name("Subtype"):     Name("DictionaryExample"),
 		Name("Version"):     Real(0.01),
 		Name("Integeritem"): Integer(12),
