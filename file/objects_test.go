@@ -159,7 +159,9 @@ func TestLiteralStringExamples345(t *testing.T) {
 
 //§7.3.7 Example
 func TestDictionaryExample(t *testing.T) {
-	literal := []byte(`<< /Type /Example
+	runTests(t, []test{
+		test{
+			literal: []byte(`<< /Type /Example
 /Subtype /DictionaryExample
 /Version 0.01
 /Integeritem 12
@@ -169,33 +171,22 @@ func TestDictionaryExample(t *testing.T) {
 				  /LastItem (not!)
 				  /VeryLastItem (OK)
 			   >>
->>`)
-
-	dict, length, err := ParseDictionary(literal)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if length != len(literal) {
-		t.Error("expected ", len(literal), ", got ", length)
-	}
-
-	err = compare(dict, Dictionary{
-		Name("Type"):        Name("Example"),
-		Name("Subtype"):     Name("DictionaryExample"),
-		Name("Version"):     Real(0.01),
-		Name("Integeritem"): Integer(12),
-		Name("StringItem"):  String("a string"),
-		Name("Subdictionary"): Dictionary{
-			Name("Item1"):        Real(0.4),
-			Name("Item2"):        Boolean(true),
-			Name("LastItem"):     String("not!"),
-			Name("VeryLastItem"): String("OK"),
+>>`),
+			object: Dictionary{
+				Name("Type"):        Name("Example"),
+				Name("Subtype"):     Name("DictionaryExample"),
+				Name("Version"):     Real(0.01),
+				Name("Integeritem"): Integer(12),
+				Name("StringItem"):  String("a string"),
+				Name("Subdictionary"): Dictionary{
+					Name("Item1"):        Real(0.4),
+					Name("Item2"):        Boolean(true),
+					Name("LastItem"):     String("not!"),
+					Name("VeryLastItem"): String("OK"),
+				},
+			},
 		},
 	})
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 //§7.3.5 Table 4
