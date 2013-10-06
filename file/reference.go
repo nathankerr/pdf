@@ -3,6 +3,7 @@ package file
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -41,9 +42,13 @@ func (file *File) loadReferences() error {
 	switch file.mmap[xrefOffset] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		// indirect object
-		_, _, err = ParseIndirectObject(file.mmap[xrefOffset:eofOffset])
+		_, n, err := ParseIndirectObject(file.mmap[xrefOffset:eofOffset])
 		if err != nil {
-			return err
+			// offset := xrefOffset+uint64(n)
+			// println(string(file.mmap[xrefOffset : xrefOffset+200]))
+			// fmt.Println(string(file.mmap[offset-20:offset]))
+			// fmt.Println(string(file.mmap[offset:offset+20]))
+			return errors.New(fmt.Sprint(xrefOffset+uint64(n), err))
 		}
 	case 'x':
 		// xref table

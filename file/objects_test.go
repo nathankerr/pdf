@@ -64,8 +64,12 @@ func TestIndirectObjectsExample1(t *testing.T) {
 			object: IndirectObject{
 				ObjectNumber:     12,
 				GenerationNumber: 0,
-				Object:           Object(String("Brillig")),
+				Object:           String("Brillig"),
 			},
+		},
+		test{
+			literal: []byte("\t(Brillig)"),
+			object:  String("Brillig"),
 		},
 	})
 }
@@ -172,6 +176,23 @@ func TestDictionaryExample(t *testing.T) {
 				  /VeryLastItem (OK)
 			   >>
 >>`),
+			object: Dictionary{
+				Name("Type"):        Name("Example"),
+				Name("Subtype"):     Name("DictionaryExample"),
+				Name("Version"):     Real(0.01),
+				Name("Integeritem"): Integer(12),
+				Name("StringItem"):  String("a string"),
+				Name("Subdictionary"): Dictionary{
+					Name("Item1"):        Real(0.4),
+					Name("Item2"):        Boolean(true),
+					Name("LastItem"):     String("not!"),
+					Name("VeryLastItem"): String("OK"),
+				},
+			},
+		},
+		// again, but without unneeded spaces
+		test{
+			literal: []byte(`<</Type/Example/Subtype/DictionaryExample/Version 0.01/Integeritem 12/StringItem (a string)/Subdictionary << /Item1 0.4/Item2 true/LastItem (not!)/VeryLastItem (OK)>>>>`),
 			object: Dictionary{
 				Name("Type"):        Name("Example"),
 				Name("Subtype"):     Name("DictionaryExample"),
@@ -349,6 +370,52 @@ func TestNull(t *testing.T) {
 		test{
 			literal: []byte("null"),
 			object:  Null{},
+		},
+	})
+}
+
+// Cross reference stream from spec without stream
+func TestSpecificationsCrossRefStream(t *testing.T) {
+	runTests(t, []test{
+		test{
+			literal: []byte(`124348 0 obj
+<</DecodeParms<</Columns 5/Predictor 12>>/Filter/FlateDecode/ID[<9597C618BC90AFA4A078CA72B2DD061C><48726007F483D547A8BEFF6E9CDA072F>]/Index[124332 848]/Info 124331 0 R/Length 137/Prev 8983958/Root 124333 0 R/Size 125180/Type/XRef/W[1 3 1]>>endobj`),
+			object: IndirectObject{
+				ObjectNumber:     124348,
+				GenerationNumber: 0,
+				Object: Dictionary{
+					Name("DecodeParms"): Dictionary{
+						Name("Columns"):   Integer(5),
+						Name("Predictor"): Integer(12),
+					},
+					Name("Filter"): Name("FlateDecode"),
+					Name("ID"): Array{
+						String([]byte{0x95, 0x97, 0xC6, 0x18, 0xBC, 0x90, 0xAF, 0xA4, 0xA0, 0x78, 0xCA, 0x72, 0xB2, 0xDD, 0x06, 0x1C}),
+						String([]byte{0x48, 0x72, 0x60, 0x07, 0xF4, 0x83, 0xD5, 0x47, 0xA8, 0xBE, 0xFF, 0x6E, 0x9C, 0xDA, 0x07, 0x2F}),
+					},
+					Name("Index"): Array{
+						Integer(124332),
+						Integer(848),
+					},
+					Name("Info"): ObjectReference{
+						ObjectNumber:     124331,
+						GenerationNumber: 0,
+					},
+					Name("Length"): Integer(137),
+					Name("Prev"):   Integer(8983958),
+					Name("Root"): ObjectReference{
+						ObjectNumber:     124333,
+						GenerationNumber: 0,
+					},
+					Name("Size"): Integer(125180),
+					Name("Type"): Name("XRef"),
+					Name("W"): Array{
+						Integer(1),
+						Integer(3),
+						Integer(1),
+					},
+				},
+			},
 		},
 	})
 }

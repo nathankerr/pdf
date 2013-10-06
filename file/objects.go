@@ -29,6 +29,10 @@ type Stream struct {
 	Stream []byte
 }
 type Null struct{} // value here does not mean anything
+type ObjectReference struct {
+	ObjectNumber     uint64
+	GenerationNumber uint64
+}
 
 // Returns an Object and the number of bytes consumed
 // if err != nil, the int is the offset in the slice
@@ -44,6 +48,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 	}
 
 	var parser parseFn
+	maybeObjectReference := false
 
 	// determine the object type
 	// except for Stream §7.3.8
@@ -55,12 +60,15 @@ func ParseObject(slice []byte) (Object, int, error) {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-':
 		// Integer §7.3.3
 		// Real §7.3.3
+		// could also be the start of an object reference
 		parser = ParseNumeric
+		maybeObjectReference = true
 	case '(':
 		// String §7.3.4
 		parser = ParseLiteralString
 	case '/':
 		// Name §7.3.5
+		// println("Name")
 		parser = ParseName
 	case '[':
 		// Array §7.3.6
@@ -68,6 +76,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 	case '<':
 		if slice[start+1] == '<' {
 			// Dictionary §7.3.7
+			// println("Dictionary")
 			parser = ParseDictionary
 		} else {
 			// String §7.3.4
@@ -81,6 +90,14 @@ func ParseObject(slice []byte) (Object, int, error) {
 	}
 
 	object, n, err := parser(slice[start:])
+
+	if maybeObjectReference {
+		objectref, n2, err := ParseObjectReference(slice[start:])
+		if err == nil {
+			object = objectref
+			n = n2
+		}
+	}
 
 	//TODO: handle streams
 
@@ -100,41 +117,41 @@ func ParseIndirectObject(slice []byte) (Object, int, error) {
 
 	// Object Number
 	token, n := nextToken(slice[i:])
-	i += n
 	io.ObjectNumber, err = strconv.ParseUint(string(token), 10, 64)
+	i += n
 	if err != nil {
 		return io, i, err
 	}
 
 	// Generation Number
 	token, n = nextToken(slice[i:])
-	i += n
 	io.GenerationNumber, err = strconv.ParseUint(string(token), 10, 64)
+	i += n
 	if err != nil {
 		return io, i, err
 	}
 
 	// "obj"
 	n, ok := match(slice[i:], "obj")
+	i += n
 	if !ok {
 		return io, i, errors.New("could not find 'obj'")
 	}
-	i += n
 
 	// the object
 	object, n, err := ParseObject(slice[i:])
-	if err != nil {
-		return object, i, err
-	}
 	i += n
 	io.Object = object
+	if err != nil {
+		return io, i, err
+	}
 
 	// "endobj"
 	n, ok = match(slice[i:], "endobj")
+	i += n
 	if !ok {
 		return io, i, errors.New("could not find 'endobj'")
 	}
-	i += n
 
 	return io, i, nil
 }
@@ -157,14 +174,12 @@ func nextToken(slice []byte) ([]byte, int) {
 	}
 
 	for end = begin; end < len(slice); end++ {
-		switch slice[end] {
-		case 0, 9, 10, 12, 13, 32, // whitespace
-			40, 41, 60, 62, 91, 93, 123, 125, 47, 37: // delimiters
-			return slice[begin:end], end - begin + 1
+		if isWhitespace(slice[end]) || isDelimiter(slice[end]) {
+			return slice[begin:end], end
 		}
 	}
 
-	return slice[begin:], len(slice[begin:])
+	return slice[begin:], len(slice)
 }
 
 func isDelimiter(char byte) bool {
@@ -195,38 +210,36 @@ func isHexDigit(char byte) bool {
 
 func nextNonWhitespace(slice []byte) (int, bool) {
 	for i := 0; i < len(slice); i++ {
-		switch slice[i] {
-		case 0, 9, 10, 12, 13, 32: // whitespace
-		default:
+		if !isWhitespace(slice[i]) {
 			return i, true
 		}
 	}
-	return -1, false
+	return 0, false
 }
 
 func nextWhitespace(slice []byte) (int, bool) {
 	for i := 0; i < len(slice); i++ {
-		switch slice[i] {
-		case 0, 9, 10, 12, 13, 32: // whitespace
+		if isWhitespace(slice[i]) {
 			return i, true
 		}
 	}
-	return -1, false
+	return 0, false
 }
 
 func match(slice []byte, toMatch string) (int, bool) {
-	start, ok := nextNonWhitespace(slice)
-	if !ok {
-		return -1, false
+	token, n := nextToken(slice)
+
+	if len(token) != len(toMatch) {
+		return 0, false
 	}
 
-	for i := 0; i < len(toMatch); i++ {
-		if slice[start+i] != toMatch[i] {
-			return -1, false
+	for i, char := range token {
+		if char != toMatch[i] {
+			return n + i, false
 		}
 	}
 
-	return start + len(toMatch), true
+	return n, true
 }
 
 func index(slice []byte, toFind byte) (int, bool) {
@@ -235,7 +248,7 @@ func index(slice []byte, toFind byte) (int, bool) {
 			return i, true
 		}
 	}
-	return -1, false
+	return 0, false
 }
 
 func ParseLiteralString(slice []byte) (Object, int, error) {
@@ -306,7 +319,7 @@ func ParseDictionary(slice []byte) (Object, int, error) {
 		// get the key
 		name, n, err := ParseName(slice[i:])
 		if err != nil {
-			return dict, i, err
+			return dict, i + n, err
 		}
 		i += n
 
@@ -472,4 +485,39 @@ func ParseNull(slice []byte) (Object, int, error) {
 	}
 
 	return Null{}, 0, errors.New("not a Null")
+}
+
+func ParseObjectReference(slice []byte) (Object, int, error) {
+	objref := ObjectReference{}
+	i := 0
+
+	objectNumber, n, err := ParseNumeric(slice[i:])
+	i += n
+	if err != nil {
+		return objref, i, err
+	}
+	integer, ok := objectNumber.(Integer)
+	if !ok {
+		return objref, i, errors.New("expected object number not an integer")
+	}
+	objref.ObjectNumber = uint64(integer)
+
+	generationNumber, n, err := ParseNumeric(slice[i:])
+	i += n
+	if err != nil {
+		return objref, i, err
+	}
+	integer, ok = generationNumber.(Integer)
+	if !ok {
+		return objref, i, errors.New("expected generation number not an integer")
+	}
+	objref.GenerationNumber = uint64(integer)
+
+	n, ok = match(slice[i:], "R")
+	i += n
+	if !ok {
+		return objref, i, errors.New("could not find end of object reference")
+	}
+
+	return objref, i, nil
 }
