@@ -310,3 +310,23 @@ func TestNumericObjects(t *testing.T) {
 		},
 	})
 }
+
+//§7.3.4.3 Examples 1, 2
+func TestHexadecimalStringExamples12(t *testing.T) {
+	runTests(t, ParseHexadecimalString, []test{
+		// Example 1
+		test{
+			literal: []byte("<4E6F762073686D6F7A206B6120706F702E>"),
+			object:  String{0x4E, 0x6F, 0x76, 0x20, 0x73, 0x68, 0x6D, 0x6F, 0x7A, 0x20, 0x6B, 0x61, 0x20, 0x70, 0x6F, 0x70, 0x2E},
+		},
+		// Example 2
+		test{
+			literal: []byte("<901FA3>"),
+			object:  String{0x90, 0x1F, 0xA3},
+		},
+		test{
+			literal: []byte("<901FA>"),
+			object:  String{0x90, 0x1F, 0xA0},
+		},
+	})
+}

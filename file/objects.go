@@ -328,3 +328,51 @@ func ParseNumeric(slice []byte) (Object, int, error) {
 
 	return Real(real), n, nil
 }
+
+func ParseHexadecimalString(slice []byte) (Object, int, error) {
+	hex := make(String, 0, int(len(slice)/2))
+
+	if slice[0] != '<' {
+		return hex, 0, errors.New("not a hexadecimal string")
+	}
+
+	i := 1
+	for i < len(slice) {
+		if slice[i] == '>' {
+			i++
+			break
+		}
+
+		if isHexDigit(slice[i]) && isHexDigit(slice[i+1]) {
+			b, err := strconv.ParseUint(string(slice[i:i+2]), 16, 8)
+			if err != nil {
+				return hex, 0, err
+			}
+			hex = append(hex, byte(b))
+			i += 2
+			continue
+		}
+
+		if isHexDigit(slice[i]) && slice[i+1] == '>' {
+			b, err := strconv.ParseUint(string(slice[i])+"0", 16, 8)
+			if err != nil {
+				return hex, 0, err
+			}
+			hex = append(hex, byte(b))
+			i += 2
+			break
+		}
+	}
+
+	return hex, i, nil
+}
+
+func isHexDigit(char byte) bool {
+	switch char {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+		'A', 'B', 'C', 'D', 'E', 'F',
+		'a', 'b', 'c', 'd', 'e', 'f':
+		return true
+	}
+	return false
+}
