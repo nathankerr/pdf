@@ -346,3 +346,13 @@ func TestArrayExample(t *testing.T) {
 		},
 	})
 }
+
+//§7.3.9
+func TestNull(t *testing.T) {
+	runTests(t, ParseNull, []test{
+		test{
+			literal: []byte("null"),
+			object:  Null{},
+		},
+	})
+}

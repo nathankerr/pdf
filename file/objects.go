@@ -443,8 +443,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 		parser = ParseName
 	case '[':
 		// Array §7.3.6
-		println("TODO: array")
-		// parser = ParseArray
+		parser = ParseArray
 	case '<':
 		if slice[start+1] == '<' {
 			// Dictionary §7.3.7
@@ -455,8 +454,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 		}
 	case 'n':
 		// Null §7.3.9
-		println("TODO: Null")
-		// parser = ParseNull
+		parser = ParseNull
 	default:
 		panic(string(slice[start]))
 	}
@@ -489,4 +487,13 @@ func ParseArray(slice []byte) (Object, int, error) {
 	}
 
 	return array, i, errors.New("end of array not found")
+}
+
+func ParseNull(slice []byte) (Object, int, error) {
+	n, ok := match(slice, "null")
+	if ok {
+		return Null{}, n, nil
+	}
+
+	return nil, 0, errors.New("not a Null")
 }
