@@ -226,3 +226,38 @@ func TestNameExamples(t *testing.T) {
 		}
 	}
 }
+
+// §7.3.2
+func TestBoolean(t *testing.T) {
+	type test struct {
+		literal []byte
+		boolean Boolean
+	}
+
+	tests := []test{
+		test{
+			literal: []byte("true"),
+			boolean: Boolean(true),
+		},
+		test{
+			literal: []byte("false"),
+			boolean: Boolean(false),
+		},
+	}
+
+	for n, test := range tests {
+		boolean, length, err := ParseBoolean(test.literal)
+		if err != nil {
+			t.Error(n, err)
+		}
+
+		if length != len(test.literal) {
+			t.Error(n, "expected", len(test.literal), "got", length)
+		}
+
+		err = compare(boolean, test.boolean)
+		if err != nil {
+			t.Error(n, err)
+		}
+	}
+}

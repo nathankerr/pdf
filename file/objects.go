@@ -282,3 +282,17 @@ func ParseName(slice []byte) (Name, int, error) {
 
 	return Name(name), i, nil
 }
+
+func ParseBoolean(slice []byte) (Boolean, int, error) {
+	n, ok := match(slice, "true")
+	if ok {
+		return Boolean(true), n, nil
+	}
+
+	n, ok = match(slice, "false")
+	if ok {
+		return Boolean(false), n, nil
+	}
+
+	return Boolean(false), 0, errors.New("not a boolean")
+}
