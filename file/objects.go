@@ -30,7 +30,62 @@ type Stream struct {
 }
 type Null struct{} // value here does not mean anything
 
+// Returns an Object and the number of bytes consumed
+// if err != nil, the int is the offset in the slice
+// where the error was discovered. The object will
+// be returned as far as it was completed (to allow
+// for inspection)
 type parseFn func(slice []byte) (Object, int, error)
+
+func ParseObject(slice []byte) (Object, int, error) {
+	start, ok := nextNonWhitespace(slice)
+	if !ok {
+		return nil, 0, errors.New("expected a non-whitespace char")
+	}
+
+	var parser parseFn
+
+	// determine the object type
+	// except for Stream §7.3.8
+	// streams start as dictionaries
+	switch slice[start] {
+	case 't', 'f':
+		// Boolean §7.3.2
+		parser = ParseBoolean
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-':
+		// Integer §7.3.3
+		// Real §7.3.3
+		parser = ParseNumeric
+	case '(':
+		// String §7.3.4
+		parser = ParseLiteralString
+	case '/':
+		// Name §7.3.5
+		parser = ParseName
+	case '[':
+		// Array §7.3.6
+		parser = ParseArray
+	case '<':
+		if slice[start+1] == '<' {
+			// Dictionary §7.3.7
+			parser = ParseDictionary
+		} else {
+			// String §7.3.4
+			parser = ParseHexadecimalString
+		}
+	case 'n':
+		// Null §7.3.9
+		parser = ParseNull
+	default:
+		panic(string(slice[start]))
+	}
+
+	object, n, err := parser(slice[start:])
+
+	//TODO: handle streams
+
+	return object, start + n, err
+}
 
 type IndirectObject struct {
 	ObjectNumber     uint64
@@ -48,7 +103,7 @@ func ParseIndirectObject(slice []byte) (Object, int, error) {
 	i += n
 	io.ObjectNumber, err = strconv.ParseUint(string(token), 10, 64)
 	if err != nil {
-		return io, n, err
+		return io, i, err
 	}
 
 	// Generation Number
@@ -56,20 +111,20 @@ func ParseIndirectObject(slice []byte) (Object, int, error) {
 	i += n
 	io.GenerationNumber, err = strconv.ParseUint(string(token), 10, 64)
 	if err != nil {
-		return io, n, err
+		return io, i, err
 	}
 
 	// "obj"
 	n, ok := match(slice[i:], "obj")
 	if !ok {
-		return io, 0, errors.New("could not find 'obj'")
+		return io, i, errors.New("could not find 'obj'")
 	}
 	i += n
 
 	// the object
 	object, n, err := ParseObject(slice[i:])
 	if err != nil {
-		return object, 0, err
+		return object, i, err
 	}
 	i += n
 	io.Object = object
@@ -77,7 +132,7 @@ func ParseIndirectObject(slice []byte) (Object, int, error) {
 	// "endobj"
 	n, ok = match(slice[i:], "endobj")
 	if !ok {
-		return io, 0, errors.New("could not find 'endobj'")
+		return io, i, errors.New("could not find 'endobj'")
 	}
 	i += n
 
@@ -123,6 +178,16 @@ func isDelimiter(char byte) bool {
 func isWhitespace(char byte) bool {
 	switch char {
 	case 0, 9, 10, 12, 13, 32: // whitespace
+		return true
+	}
+	return false
+}
+
+func isHexDigit(char byte) bool {
+	switch char {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+		'A', 'B', 'C', 'D', 'E', 'F',
+		'a', 'b', 'c', 'd', 'e', 'f':
 		return true
 	}
 	return false
@@ -174,14 +239,16 @@ func index(slice []byte, toFind byte) (int, bool) {
 }
 
 func ParseLiteralString(slice []byte) (Object, int, error) {
+	decoded := make([]byte, len(slice))
+	decodedIndex := 0
+
 	if slice[0] != '(' {
-		return nil, 0, errors.New("not a literal string")
+		return String(decoded[:decodedIndex]), 0, errors.New("not a literal string")
 	}
 
 	parens := 0
-	decoded := make([]byte, len(slice))
-	decodedIndex := 0
-	for i := 0; i < len(slice); i++ {
+	i := 0
+	for i < len(slice) {
 		include := true
 		switch slice[i] {
 		case '(':
@@ -207,25 +274,26 @@ func ParseLiteralString(slice []byte) (Object, int, error) {
 			decoded[decodedIndex] = slice[i]
 			decodedIndex++
 		}
+		i++
 	}
 
-	return nil, 0, errors.New("couldn't find end of string")
+	return String(decoded[:decodedIndex]), i, errors.New("couldn't find end of string")
 }
 
 // returned int is the length of slice consumed
 func ParseDictionary(slice []byte) (Object, int, error) {
-	if slice[0] != '<' && slice[1] != '<' {
-		return nil, 0, errors.New("not a dictionary")
-	}
-
 	dict := make(Dictionary)
+
+	if slice[0] != '<' && slice[1] != '<' {
+		return dict, 0, errors.New("not a dictionary")
+	}
 
 	i := 2
 	for i < len(slice) {
 		// skip whitespace
 		n, ok := nextNonWhitespace(slice[i:])
 		if !ok {
-			return nil, 0, errors.New("expected a non-whitespace char")
+			return dict, i, errors.New("expected a non-whitespace char")
 		}
 		i += n
 
@@ -238,19 +306,19 @@ func ParseDictionary(slice []byte) (Object, int, error) {
 		// get the key
 		name, n, err := ParseName(slice[i:])
 		if err != nil {
-			return nil, 0, err
+			return dict, i, err
 		}
 		i += n
 
 		key, ok := name.(Name)
 		if !ok {
-			return nil, 0, errors.New("unable to cast Name")
+			return dict, i, errors.New("unable to cast Name")
 		}
 
 		// get the value
 		value, n, err := ParseObject(slice[i:])
 		if err != nil {
-			return nil, 0, err
+			return dict, i, err
 		}
 		i += n
 
@@ -262,11 +330,11 @@ func ParseDictionary(slice []byte) (Object, int, error) {
 }
 
 func ParseName(slice []byte) (Object, int, error) {
-	if slice[0] != '/' {
-		return Name(""), 0, errors.New("not a name")
-	}
-
 	name := make([]byte, 0, len(slice))
+
+	if slice[0] != '/' {
+		return Name(name), 0, errors.New("not a name")
+	}
 
 	i := 1
 	for i < len(slice) {
@@ -278,7 +346,7 @@ func ParseName(slice []byte) (Object, int, error) {
 		case '#':
 			char, err := strconv.ParseUint(string(slice[i+1:i+3]), 16, 8)
 			if err != nil {
-				return Name(""), 0, err
+				return Name(name), i, err
 			}
 			name = append(name, byte(char))
 			i += 2
@@ -320,7 +388,7 @@ func ParseNumeric(slice []byte) (Object, int, error) {
 	if isInteger {
 		integer, err := strconv.ParseInt(string(token), 10, 0)
 		if err != nil {
-			return Integer(0), 0, err
+			return Integer(integer), n, err
 		}
 
 		return Integer(integer), n, nil
@@ -328,7 +396,7 @@ func ParseNumeric(slice []byte) (Object, int, error) {
 
 	real, err := strconv.ParseFloat(string(token), 64)
 	if err != nil {
-		return Real(0), 0, err
+		return Real(0), n, err
 	}
 
 	return Real(real), n, nil
@@ -351,7 +419,7 @@ func ParseHexadecimalString(slice []byte) (Object, int, error) {
 		if isHexDigit(slice[i]) && isHexDigit(slice[i+1]) {
 			b, err := strconv.ParseUint(string(slice[i:i+2]), 16, 8)
 			if err != nil {
-				return hex, 0, err
+				return hex, i, err
 			}
 			hex = append(hex, byte(b))
 			i += 2
@@ -361,7 +429,7 @@ func ParseHexadecimalString(slice []byte) (Object, int, error) {
 		if isHexDigit(slice[i]) && slice[i+1] == '>' {
 			b, err := strconv.ParseUint(string(slice[i])+"0", 16, 8)
 			if err != nil {
-				return hex, 0, err
+				return hex, i, err
 			}
 			hex = append(hex, byte(b))
 			i += 2
@@ -370,66 +438,6 @@ func ParseHexadecimalString(slice []byte) (Object, int, error) {
 	}
 
 	return hex, i, nil
-}
-
-func isHexDigit(char byte) bool {
-	switch char {
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-		'A', 'B', 'C', 'D', 'E', 'F',
-		'a', 'b', 'c', 'd', 'e', 'f':
-		return true
-	}
-	return false
-}
-
-func ParseObject(slice []byte) (Object, int, error) {
-	start, ok := nextNonWhitespace(slice)
-	if !ok {
-		return nil, 0, errors.New("expected a non-whitespace char")
-	}
-
-	var parser parseFn
-
-	// println("\t" + string(slice[start:]))
-
-	// determine the object type
-	// except for Stream §7.3.8
-	// streams start as dictionaries
-	switch slice[start] {
-	case 't', 'f':
-		// Boolean §7.3.2
-		parser = ParseBoolean
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-':
-		// Integer §7.3.3
-		// Real §7.3.3
-		parser = ParseNumeric
-	case '(':
-		// String §7.3.4
-		parser = ParseLiteralString
-	case '/':
-		// Name §7.3.5
-		parser = ParseName
-	case '[':
-		// Array §7.3.6
-		parser = ParseArray
-	case '<':
-		if slice[start+1] == '<' {
-			// Dictionary §7.3.7
-			parser = ParseDictionary
-		} else {
-			// String §7.3.4
-			parser = ParseHexadecimalString
-		}
-	case 'n':
-		// Null §7.3.9
-		parser = ParseNull
-	default:
-		panic(string(slice[start]))
-	}
-
-	object, n, err := parser(slice[start:])
-
-	return object, start + n, err
 }
 
 func ParseArray(slice []byte) (Object, int, error) {
@@ -447,7 +455,7 @@ func ParseArray(slice []byte) (Object, int, error) {
 
 		object, n, err := ParseObject(slice[i:])
 		if err != nil {
-			return array, 0, err
+			return array, i, err
 		}
 		i += n
 
@@ -463,5 +471,5 @@ func ParseNull(slice []byte) (Object, int, error) {
 		return Null{}, n, nil
 	}
 
-	return nil, 0, errors.New("not a Null")
+	return Null{}, 0, errors.New("not a Null")
 }
