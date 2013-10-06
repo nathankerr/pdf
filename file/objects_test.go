@@ -330,3 +330,19 @@ func TestHexadecimalStringExamples12(t *testing.T) {
 		},
 	})
 }
+
+//§7.3.6
+func TestArrayExample(t *testing.T) {
+	runTests(t, ParseArray, []test{
+		test{
+			literal: []byte("[549 3.14 false (Ralph) /SomeName]"),
+			object: Array{
+				Integer(549),
+				Real(3.14),
+				Boolean(false),
+				String("Ralph"),
+				Name("SomeName"),
+			},
+		},
+	})
+}

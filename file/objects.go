@@ -144,6 +144,22 @@ func nextToken(slice []byte) ([]byte, int) {
 	return slice[begin:], len(slice[begin:])
 }
 
+func isDelimiter(char byte) bool {
+	switch char {
+	case 40, 41, 60, 62, 91, 93, 123, 125, 47, 37: // delimiters
+		return true
+	}
+	return false
+}
+
+func isWhitespace(char byte) bool {
+	switch char {
+	case 0, 9, 10, 12, 13, 32: // whitespace
+		return true
+	}
+	return false
+}
+
 func nextNonWhitespace(slice []byte) (int, bool) {
 	for i := 0; i < len(slice); i++ {
 		switch slice[i] {
@@ -286,9 +302,11 @@ func ParseName(slice []byte) (Object, int, error) {
 
 	i := 1
 	for i < len(slice) {
+		if isDelimiter(slice[i]) || isWhitespace(slice[i]) {
+			break
+		}
+
 		switch slice[i] {
-		case 0, 9, 10, 12, 13, 32: // whitespace
-			return Name(name), i, nil
 		case '#':
 			char, err := strconv.ParseUint(string(slice[i+1:i+3]), 16, 8)
 			if err != nil {
@@ -404,7 +422,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 
 	var parser parseFn
 
-	println("\t" + string(slice[start:]))
+	// println("\t" + string(slice[start:]))
 
 	// determine the object type
 	// except for Stream §7.3.8
@@ -446,4 +464,29 @@ func ParseObject(slice []byte) (Object, int, error) {
 	object, n, err := parser(slice[start:])
 
 	return object, start + n, err
+}
+
+func ParseArray(slice []byte) (Object, int, error) {
+	array := make(Array, 0)
+
+	if slice[0] != '[' {
+		return array, 0, errors.New("not an array")
+	}
+
+	i := 1
+	for i < len(slice) {
+		if slice[i] == ']' {
+			return array, i + 1, nil
+		}
+
+		object, n, err := ParseObject(slice[i:])
+		if err != nil {
+			return array, 0, err
+		}
+		i += n
+
+		array = append(array, object)
+	}
+
+	return array, i, errors.New("end of array not found")
 }
