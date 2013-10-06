@@ -15,7 +15,7 @@ type test struct {
 }
 
 // general test runner for parse function tests
-func runTests(t *testing.T, fn parseFn, tests []test) {
+func runTests(t *testing.T, tests []test) {
 	pc, _, line, ok := runtime.Caller(1)
 	caller := "UNABLE TO DETERMINE CALLER"
 	if ok {
@@ -25,6 +25,14 @@ func runTests(t *testing.T, fn parseFn, tests []test) {
 	}
 
 	for n, test := range tests {
+		var fn parseFn
+		switch test.object.(type) {
+		case IndirectObject:
+			fn = ParseIndirectObject
+		default:
+			fn = ParseObject
+		}
+
 		object, length, err := fn(test.literal)
 		if err != nil {
 			t.Errorf("%v test %v\nParse Error:\n\t%v\n", caller, n, err)
@@ -50,7 +58,7 @@ func compare(got, expected interface{}) error {
 
 // §7.3.10 Example 1
 func TestIndirectObjectsExample1(t *testing.T) {
-	runTests(t, ParseIndirectObject, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("12 0 obj\n\t(Brillig)\nendobj"),
 			object: IndirectObject{
@@ -64,7 +72,7 @@ func TestIndirectObjectsExample1(t *testing.T) {
 
 // §7.3.4.2 Example 1
 func TestLiteralStringExample1(t *testing.T) {
-	runTests(t, ParseLiteralString, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("(This is a string)"),
 			object:  String("This is a string"),
@@ -118,7 +126,7 @@ func TestLiteralStringExample2(t *testing.T) {
 // Example 2). These examples are included for
 // completeness.
 func TestLiteralStringExamples345(t *testing.T) {
-	runTests(t, ParseLiteralString, []test{
+	runTests(t, []test{
 		// Example 3
 		test{
 			literal: []byte("(This string has an end-of-line at the end of it.\n)"),
@@ -192,7 +200,7 @@ func TestDictionaryExample(t *testing.T) {
 
 //§7.3.5 Table 4
 func TestNameExamples(t *testing.T) {
-	runTests(t, ParseName, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("/Name1"),
 			object:  Name("Name1"),
@@ -246,7 +254,7 @@ func TestNameExamples(t *testing.T) {
 
 // §7.3.2
 func TestBoolean(t *testing.T) {
-	runTests(t, ParseBoolean, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("true"),
 			object:  Boolean(true),
@@ -260,7 +268,7 @@ func TestBoolean(t *testing.T) {
 
 //§7.3.3
 func TestNumericObjects(t *testing.T) {
-	runTests(t, ParseNumeric, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("123"),
 			object:  Integer(123),
@@ -310,7 +318,7 @@ func TestNumericObjects(t *testing.T) {
 
 //§7.3.4.3 Examples 1, 2
 func TestHexadecimalStringExamples12(t *testing.T) {
-	runTests(t, ParseHexadecimalString, []test{
+	runTests(t, []test{
 		// Example 1
 		test{
 			literal: []byte("<4E6F762073686D6F7A206B6120706F702E>"),
@@ -330,7 +338,7 @@ func TestHexadecimalStringExamples12(t *testing.T) {
 
 //§7.3.6
 func TestArrayExample(t *testing.T) {
-	runTests(t, ParseArray, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("[549 3.14 false (Ralph) /SomeName]"),
 			object: Array{
@@ -346,7 +354,7 @@ func TestArrayExample(t *testing.T) {
 
 //§7.3.9
 func TestNull(t *testing.T) {
-	runTests(t, ParseNull, []test{
+	runTests(t, []test{
 		test{
 			literal: []byte("null"),
 			object:  Null{},
