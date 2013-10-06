@@ -30,6 +30,8 @@ type Stream struct {
 }
 type Null struct{} // value here does not mean anything
 
+type parseFn func(slice []byte) (Object, int, error)
+
 type IndirectObject struct {
 	ObjectNumber     uint64
 	GenerationNumber uint64
@@ -84,7 +86,8 @@ func ParseIndirectObject(slice []byte) (*IndirectObject, error) {
 	case '(':
 		// String §7.3.4
 		println("Literal String")
-		io.Object, err = ParseLiteralString(slice[start:])
+		io.Object, n, err = ParseLiteralString(slice[start:])
+		start += n
 	case '/':
 		// Name §7.3.5
 		println("Name")
@@ -187,9 +190,9 @@ func index(slice []byte, toFind byte) (int, bool) {
 	return -1, false
 }
 
-func ParseLiteralString(slice []byte) (String, error) {
+func ParseLiteralString(slice []byte) (Object, int, error) {
 	if slice[0] != '(' {
-		return nil, errors.New("not a literal string")
+		return nil, 0, errors.New("not a literal string")
 	}
 
 	parens := 0
@@ -206,7 +209,7 @@ func ParseLiteralString(slice []byte) (String, error) {
 		case ')':
 			parens--
 			if parens == 0 {
-				return decoded[:decodedIndex], nil
+				return String(decoded[:decodedIndex]), i + 1, nil
 			} else {
 				include = true
 			}
@@ -223,7 +226,7 @@ func ParseLiteralString(slice []byte) (String, error) {
 		}
 	}
 
-	return nil, errors.New("couldn't find end of string")
+	return nil, 0, errors.New("couldn't find end of string")
 }
 
 // returned int is the length of slice consumed
@@ -255,7 +258,7 @@ func ParseDictionary(slice []byte) (Dictionary, int, error) {
 	return dict, i, nil
 }
 
-func ParseName(slice []byte) (Name, int, error) {
+func ParseName(slice []byte) (Object, int, error) {
 	if slice[0] != '/' {
 		return Name(""), 0, errors.New("not a name")
 	}
@@ -283,7 +286,7 @@ func ParseName(slice []byte) (Name, int, error) {
 	return Name(name), i, nil
 }
 
-func ParseBoolean(slice []byte) (Boolean, int, error) {
+func ParseBoolean(slice []byte) (Object, int, error) {
 	n, ok := match(slice, "true")
 	if ok {
 		return Boolean(true), n, nil
