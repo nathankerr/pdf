@@ -261,3 +261,74 @@ func TestBoolean(t *testing.T) {
 		}
 	}
 }
+
+//§7.3.3
+func TestNumericObjects(t *testing.T) {
+	type test struct {
+		literal []byte
+		numeric Object
+	}
+
+	tests := []test{
+		test{
+			literal: []byte("123"),
+			numeric: Integer(123),
+		},
+		test{
+			literal: []byte("43445"),
+			numeric: Integer(43445),
+		},
+		test{
+			literal: []byte("+17"),
+			numeric: Integer(17),
+		},
+		test{
+			literal: []byte("-98"),
+			numeric: Integer(-98),
+		},
+		test{
+			literal: []byte("0"),
+			numeric: Integer(0),
+		},
+		test{
+			literal: []byte("34.5"),
+			numeric: Real(34.5),
+		},
+		test{
+			literal: []byte("-3.62"),
+			numeric: Real(-3.62),
+		},
+		test{
+			literal: []byte("+123.6"),
+			numeric: Real(123.6),
+		},
+		test{
+			literal: []byte("4."),
+			numeric: Real(4),
+		},
+		test{
+			literal: []byte("-.002"),
+			numeric: Real(-.002),
+		},
+		test{
+			literal: []byte("0.0"),
+			numeric: Real(0.0),
+		},
+	}
+
+	for n, test := range tests {
+		numeric, length, err := ParseNumeric(test.literal)
+		if err != nil {
+			t.Error(n, err)
+		}
+
+		if length != len(test.literal) {
+			t.Error(n, "expected", len(test.literal), "got", length)
+		}
+
+		err = compare(numeric, test.numeric)
+		if err != nil {
+			t.Error(n, err)
+		}
+	}
+}

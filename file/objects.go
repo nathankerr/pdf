@@ -296,3 +296,32 @@ func ParseBoolean(slice []byte) (Boolean, int, error) {
 
 	return Boolean(false), 0, errors.New("not a boolean")
 }
+
+// returns Integer when integer, Real when real
+func ParseNumeric(slice []byte) (Object, int, error) {
+	token, n := nextToken(slice)
+
+	isInteger := true
+	for _, char := range token {
+		if char == '.' {
+			isInteger = false
+			break
+		}
+	}
+
+	if isInteger {
+		integer, err := strconv.ParseInt(string(token), 10, 0)
+		if err != nil {
+			return Integer(0), 0, err
+		}
+
+		return Integer(integer), n, nil
+	}
+
+	real, err := strconv.ParseFloat(string(token), 64)
+	if err != nil {
+		return Real(0), 0, err
+	}
+
+	return Real(real), n, nil
+}
