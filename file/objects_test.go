@@ -50,19 +50,16 @@ func compare(got, expected interface{}) error {
 
 // §7.3.10 Example 1
 func TestIndirectObjectsExample1(t *testing.T) {
-	io, err := ParseIndirectObject([]byte("12 0 obj\n\t(Brillig)\nendobj"))
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = compare(io, &IndirectObject{
-		ObjectNumber:     12,
-		GenerationNumber: 0,
-		Object:           Object(String("Brillig")),
+	runTests(t, ParseIndirectObject, []test{
+		test{
+			literal: []byte("12 0 obj\n\t(Brillig)\nendobj"),
+			object: IndirectObject{
+				ObjectNumber:     12,
+				GenerationNumber: 0,
+				Object:           Object(String("Brillig")),
+			},
+		},
 	})
-	if err != nil {
-		t.Error("Example1", err)
-	}
 }
 
 // §7.3.4.2 Example 1

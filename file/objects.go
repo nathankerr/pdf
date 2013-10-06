@@ -38,82 +38,50 @@ type IndirectObject struct {
 	Object
 }
 
-func ParseIndirectObject(slice []byte) (*IndirectObject, error) {
-	io := new(IndirectObject)
-
-	start := 0
+func ParseIndirectObject(slice []byte) (Object, int, error) {
+	var io IndirectObject
+	i := 0
 	var err error
 
 	// Object Number
-	token, n := nextToken(slice[start:])
-	start += n
+	token, n := nextToken(slice[i:])
+	i += n
 	io.ObjectNumber, err = strconv.ParseUint(string(token), 10, 64)
 	if err != nil {
-		return nil, err
+		return io, n, err
 	}
 
 	// Generation Number
-	token, n = nextToken(slice[start:])
-	start += n
+	token, n = nextToken(slice[i:])
+	i += n
 	io.GenerationNumber, err = strconv.ParseUint(string(token), 10, 64)
 	if err != nil {
-		return nil, err
+		return io, n, err
 	}
 
 	// "obj"
-	n, ok := match(slice[start:], "obj")
+	n, ok := match(slice[i:], "obj")
 	if !ok {
-		return nil, errors.New("could not find 'obj'")
+		return io, 0, errors.New("could not find 'obj'")
 	}
-	start += n
+	i += n
 
 	// the object
-	if n, ok := nextNonWhitespace(slice[start:]); ok {
-		start += n
+	object, n, err := ParseObject(slice[i:])
+	if err != nil {
+		return object, 0, err
 	}
+	i += n
+	io.Object = object
 
-	// determine the object type
-	// except for Stream §7.3.8
-	// streams start as dictionaries
-	switch slice[start] {
-	case 't', 'f':
-		// Boolean §7.3.2
-		println("Boolean")
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-':
-		// Integer §7.3.3
-		// Real §7.3.3
-		println("Numeric")
-	case '(':
-		// String §7.3.4
-		io.Object, n, err = ParseLiteralString(slice[start:])
-		start += n
-	case '/':
-		// Name §7.3.5
-		println("Name")
-	case '[':
-		// Array §7.3.6
-		println("Array")
-	case '<':
-		if slice[start+1] == '<' {
-			// Dictionary §7.3.7
-			println("Dictionary")
-		} else {
-			// String §7.3.4
-			println("Hexadecimal String")
-		}
-	case 'n':
-		// Null §7.3.9
-		println("Null")
-	default:
-		panic(string(slice[start]))
+	// "endobj"
+	n, ok = match(slice[i:], "endobj")
+	if !ok {
+		return io, 0, errors.New("could not find 'endobj'")
 	}
+	i += n
 
-	// switch object.(type) {
-	// case Dictionary:
-	// 	// check to see if it is really a stream
-	// }
-
-	return io, nil
+	return io, i, nil
 }
 
 // for tokenized things, returns the next token
