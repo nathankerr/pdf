@@ -49,6 +49,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 
 	var parser parseFn
 	maybeObjectReference := false
+	maybeStream := false
 
 	// determine the object type
 	// except for Stream §7.3.8
@@ -78,6 +79,7 @@ func ParseObject(slice []byte) (Object, int, error) {
 			// Dictionary §7.3.7
 			// println("Dictionary")
 			parser = ParseDictionary
+			maybeStream = true
 		} else {
 			// String §7.3.4
 			parser = ParseHexadecimalString
@@ -99,7 +101,44 @@ func ParseObject(slice []byte) (Object, int, error) {
 		}
 	}
 
-	//TODO: handle streams
+	// handle streams
+	if maybeStream {
+		n2, isStream := match(slice[start+n:], "stream")
+		if isStream {
+			n += n2
+
+			// consume end of line (§7.3.8.1 paragraph after example)
+			switch slice[start+n] {
+			case 13: // carriage return
+				n++
+				if slice[start+n] != '\n' {
+					return object, start + n + 1, errors.New("end of line marker cannot have only a carriage return")
+				}
+			case '\n': // new line
+			default:
+				return object, start + n + 1, errors.New("expected end of line marker")
+			}
+			n++
+
+			dict, isDictionary := object.(Dictionary)
+			if !isDictionary {
+				return object, start + n, errors.New("expected a Dictionary")
+			}
+
+			streamLength := int(dict["Length"].(Integer))
+			object = Stream{
+				Dictionary: dict,
+				Stream:     slice[start+n : start+n+streamLength],
+			}
+			n += streamLength
+
+			n2, ok = match(slice[start+n:], "endstream")
+			n += n2
+			if !ok {
+				return object, start + n, errors.New("expected 'endstream'")
+			}
+		}
+	}
 
 	return object, start + n, err
 }

@@ -378,42 +378,44 @@ func TestNull(t *testing.T) {
 func TestSpecificationsCrossRefStream(t *testing.T) {
 	runTests(t, []test{
 		test{
-			literal: []byte(`124348 0 obj
-<</DecodeParms<</Columns 5/Predictor 12>>/Filter/FlateDecode/ID[<9597C618BC90AFA4A078CA72B2DD061C><48726007F483D547A8BEFF6E9CDA072F>]/Index[124332 848]/Info 124331 0 R/Length 137/Prev 8983958/Root 124333 0 R/Size 125180/Type/XRef/W[1 3 1]>>endobj`),
+			literal: []byte("124348 0 obj\r<</DecodeParms<</Columns 5/Predictor 12>>/Filter/FlateDecode/ID[<9597C618BC90AFA4A078CA72B2DD061C><48726007F483D547A8BEFF6E9CDA072F>]/Index[124332 848]/Info 124331 0 R/Length 137/Prev 8983958/Root 124333 0 R/Size 125180/Type/XRef/W[1 3 1]>>stream\r\nh\xde\xecұ\r\x82`\x10\x86\xe1\xbb?t\x82Rа\x00\xee\x00\v\xb8\x83\v\xb8\x8a\xb5\xb5\x03\x98\xb8\b\x83P\x90XX\x98X`\x82|7\x80\xc6ּ͓+.W\\\xde\xe4f\xa5%\xb3\xedM\xfa#|\xcal/\xd3A\xae\xaer3\xc8\xf5I\x16Ux\f\xeb\xd0e\xde\xc6\xfc\x92U/wwK\xeeC\xa7y\xb9\xfd\xc9l\xfa\xbe\x83\xf8\xab~\xe6\x0fHWHWHW\x88t\x85t\x85t\x85\xf8\x87]\xcdss\x19\xdf\x02\f\x00\x8d=\x1f\x11\r\nendstream\rendobj"),
 			object: IndirectObject{
 				ObjectNumber:     124348,
 				GenerationNumber: 0,
-				Object: Dictionary{
-					Name("DecodeParms"): Dictionary{
-						Name("Columns"):   Integer(5),
-						Name("Predictor"): Integer(12),
+				Object: Stream{
+					Dictionary: Dictionary{
+						Name("DecodeParms"): Dictionary{
+							Name("Columns"):   Integer(5),
+							Name("Predictor"): Integer(12),
+						},
+						Name("Filter"): Name("FlateDecode"),
+						Name("ID"): Array{
+							String([]byte{0x95, 0x97, 0xC6, 0x18, 0xBC, 0x90, 0xAF, 0xA4, 0xA0, 0x78, 0xCA, 0x72, 0xB2, 0xDD, 0x06, 0x1C}),
+							String([]byte{0x48, 0x72, 0x60, 0x07, 0xF4, 0x83, 0xD5, 0x47, 0xA8, 0xBE, 0xFF, 0x6E, 0x9C, 0xDA, 0x07, 0x2F}),
+						},
+						Name("Index"): Array{
+							Integer(124332),
+							Integer(848),
+						},
+						Name("Info"): ObjectReference{
+							ObjectNumber:     124331,
+							GenerationNumber: 0,
+						},
+						Name("Length"): Integer(137),
+						Name("Prev"):   Integer(8983958),
+						Name("Root"): ObjectReference{
+							ObjectNumber:     124333,
+							GenerationNumber: 0,
+						},
+						Name("Size"): Integer(125180),
+						Name("Type"): Name("XRef"),
+						Name("W"): Array{
+							Integer(1),
+							Integer(3),
+							Integer(1),
+						},
 					},
-					Name("Filter"): Name("FlateDecode"),
-					Name("ID"): Array{
-						String([]byte{0x95, 0x97, 0xC6, 0x18, 0xBC, 0x90, 0xAF, 0xA4, 0xA0, 0x78, 0xCA, 0x72, 0xB2, 0xDD, 0x06, 0x1C}),
-						String([]byte{0x48, 0x72, 0x60, 0x07, 0xF4, 0x83, 0xD5, 0x47, 0xA8, 0xBE, 0xFF, 0x6E, 0x9C, 0xDA, 0x07, 0x2F}),
-					},
-					Name("Index"): Array{
-						Integer(124332),
-						Integer(848),
-					},
-					Name("Info"): ObjectReference{
-						ObjectNumber:     124331,
-						GenerationNumber: 0,
-					},
-					Name("Length"): Integer(137),
-					Name("Prev"):   Integer(8983958),
-					Name("Root"): ObjectReference{
-						ObjectNumber:     124333,
-						GenerationNumber: 0,
-					},
-					Name("Size"): Integer(125180),
-					Name("Type"): Name("XRef"),
-					Name("W"): Array{
-						Integer(1),
-						Integer(3),
-						Integer(1),
-					},
+					Stream: []byte{0x68, 0xde, 0xec, 0xd2, 0xb1, 0xd, 0x82, 0x60, 0x10, 0x86, 0xe1, 0xbb, 0x3f, 0x74, 0x82, 0x52, 0xd0, 0xb0, 0x0, 0xee, 0x0, 0xb, 0xb8, 0x83, 0xb, 0xb8, 0x8a, 0xb5, 0xb5, 0x3, 0x98, 0xb8, 0x8, 0x83, 0x50, 0x90, 0x58, 0x58, 0x98, 0x58, 0x60, 0x82, 0x7c, 0x37, 0x80, 0xc6, 0xd6, 0xbc, 0xcd, 0x93, 0x2b, 0x2e, 0x57, 0x5c, 0xde, 0xe4, 0x66, 0xa5, 0x25, 0xb3, 0xed, 0x4d, 0xfa, 0x23, 0x7c, 0xca, 0x6c, 0x2f, 0xd3, 0x41, 0xae, 0xae, 0x72, 0x33, 0xc8, 0xf5, 0x49, 0x16, 0x55, 0x78, 0xc, 0xeb, 0xd0, 0x65, 0xde, 0xc6, 0xfc, 0x92, 0x55, 0x2f, 0x77, 0x77, 0x4b, 0xee, 0x43, 0xa7, 0x79, 0xb9, 0xfd, 0xc9, 0x6c, 0xfa, 0xbe, 0x83, 0xf8, 0xab, 0x7e, 0xe6, 0xf, 0x48, 0x57, 0x48, 0x57, 0x48, 0x57, 0x88, 0x74, 0x85, 0x74, 0x85, 0x74, 0x85, 0xf8, 0x87, 0x5d, 0xcd, 0x73, 0x73, 0x19, 0xdf, 0x2, 0xc, 0x0, 0x8d, 0x3d, 0x1f, 0x11},
 				},
 			},
 		},
