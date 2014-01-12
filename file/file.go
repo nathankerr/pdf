@@ -42,6 +42,24 @@ func Open(filename string) (*File, error) {
 	return file, nil
 }
 
+// finds the object "object_number generation_number"
+// returns Null when object not found
+func (f *File) Get(reference string) Object {
+	return Null{}
+}
+
+// adds an object to the file, returns the object reference "object_number generation_number"
+func (f *File) Put(obj Object) string {
+	return ""
+}
+
+// Writes the objects that have been put into the File to the file.
+// A new object index will be written (taking up space)
+// the File object is still usable after calling this. The effect will be as if the file was newly opened.
+func (f *File) Write() error {
+	return nil
+}
+
 func (f *File) Close() error {
 	err := f.mmap.Unmap()
 	if err != nil {

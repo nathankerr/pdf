@@ -28,9 +28,9 @@ func runTests(t *testing.T, tests []test) {
 		var fn parseFn
 		switch test.object.(type) {
 		case IndirectObject:
-			fn = ParseIndirectObject
+			fn = parseIndirectObject
 		default:
-			fn = ParseObject
+			fn = parseObject
 		}
 
 		object, length, err := fn(test.literal)
@@ -106,11 +106,11 @@ func TestLiteralStringExample1(t *testing.T) {
 
 // §7.3.4.2 Example 2
 func TestLiteralStringExample2(t *testing.T) {
-	first, _, err := ParseLiteralString([]byte("(These \\\ntwo strings \\\nare the same.)"))
+	first, _, err := parseLiteralString([]byte("(These \\\ntwo strings \\\nare the same.)"))
 	if err != nil {
 		t.Error(err)
 	}
-	second, _, err := ParseLiteralString([]byte("(These two strings are the same.)"))
+	second, _, err := parseLiteralString([]byte("(These two strings are the same.)"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -374,7 +374,7 @@ func TestNull(t *testing.T) {
 	})
 }
 
-// Cross reference stream from spec without stream
+// Cross reference stream from spec
 func TestSpecificationsCrossRefStream(t *testing.T) {
 	runTests(t, []test{
 		test{
