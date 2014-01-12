@@ -11,28 +11,27 @@ import (
 // §7.5.4 Cross-Reference Table
 // §7.5.5 File Trailer
 // §7.5.8 Cross-Reference Streams
-type Trailer {
-	Size Integer // required, not an indirect reference
-	Prev Integer // present only if the file has more than one cross-reference section
-	Root Dictionary // required, shall be an indirect reference
+type Trailer struct {
+	Size    Integer    // required, not an indirect reference
+	Prev    Integer    // present only if the file has more than one cross-reference section
+	Root    Dictionary // required, shall be an indirect reference
 	Encrypt Dictionary // required if document is encrypted; PDF-1.1
-	Info Dictionary // optional, shall be an indirect reference
-	ID Array // required if Encrypt entry is present; optional otherwise; PDF-1.1
-	
+	Info    Dictionary // optional, shall be an indirect reference
+	ID      Array      // required if Encrypt entry is present; optional otherwise; PDF-1.1
+
 	XRefStm Integer // optional
 
 	Index Array // optional
-	W Array // required
+	W     Array // required
 }
-
 
 // Table 18 defines the cross-reference stream type
 // type 0 = f entries in cross-reference table
 // type 1 = n entries in cross-reference table
 // type 2 nnot in cross-reference table
-CrossReference [3]int
+type CrossReference [3]int
 
-CrossReferences map[string]CrossReference
+type CrossReferences map[string]CrossReference
 
 // handles cross-references
 func (file *File) loadReferences() error {
