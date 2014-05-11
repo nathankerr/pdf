@@ -17,7 +17,7 @@ func main() {
 
 	pdf, err := file.Open(filename)
 	if err != nil {
-		log.Fatalln(filename, err)
+		log.Fatalf("%s: %s\n", filename, err)
 	}
 
 	err = pdf.Close()

@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// tables 15, 19
+// tables 15, 17, 19
 // §7.5.4 Cross-Reference Table
 // §7.5.5 File Trailer
 // §7.5.8 Cross-Reference Streams
@@ -28,7 +28,7 @@ type Trailer struct {
 // Table 18 defines the cross-reference stream type
 // type 0 = f entries in cross-reference table
 // type 1 = n entries in cross-reference table
-// type 2 nnot in cross-reference table
+// type 2 not in cross-reference table
 type CrossReference [3]int
 
 type CrossReferences map[string]CrossReference
@@ -67,13 +67,77 @@ func (file *File) loadReferences() error {
 	switch file.mmap[xrefOffset] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		// indirect object and therefore a cross-reference stream §7.5.8
-		xrstream, _, err := parseIndirectObject(file.mmap[xrefOffset:eofOffset])
+		xrstreamAsObject, _, err := parseIndirectObject(file.mmap[xrefOffset:eofOffset])
 		if err != nil {
 			return err
 		}
-		fmt.Println(xrstream)
+		xrstream := xrstreamAsObject.(IndirectObject).Object.(Stream)
+
+		stream, err := xrstream.Decode()
+		if err != nil {
+			return err
+		}
+		// fmt.Printf("%v\n", xrstream.Stream)
+		// fmt.Printf("%v\n", stream)
+
+		w := xrstream.Dictionary[Name("W")].(Array)
+		wi := []int{}
+
+		size := int(xrstream.Dictionary[Name("Size")].(Integer))
+
+		stride := 0
+		for _, integer := range w {
+			stride += int(integer.(Integer))
+			wi = append(wi, int(integer.(Integer)))
+		}
+
+		type index struct {
+			objectNumber int
+			size         int
+		}
+		indexes := []index{}
+
+		indexArrayAsObject := xrstream.Dictionary[Name("Index")]
+		if indexArrayAsObject == nil {
+			// default when Index is not specified
+			indexes = append(indexes, index{0, size})
+		} else {
+			indexArray := indexArrayAsObject.(Array)
+			for i := 0; i < len(indexArray); i += 2 {
+				indexes = append(indexes, index{
+					int(indexArray[i].(Integer)),
+					int(indexArray[i+1].(Integer)),
+				})
+			}
+		}
+
+		for _, index := range indexes {
+			objectNumber := index.objectNumber
+			offset := 0
+			for n := 0; n < index.size; n++ {
+				for offset < len(stream) {
+					xref := CrossReference{}
+					ioffset := 0
+					for i := 0; i < 2; i++ {
+						width := wi[i]
+						start := offset + ioffset
+						xref[i] = bytesToInt(stream[start : start+width])
+						ioffset += width
+					}
+					fmt.Println(objectNumber, xref)
+
+					objectNumber++
+					offset += stride
+				}
+			}
+		}
+
+		fmt.Println("Index:", len(stream)%stride, size, indexArrayAsObject, indexes)
+
+		// fmt.Println("XREF: ", w, stride, len(xrstream.Stream), len(stream), len(stream) % stride, xrstream.Dictionary)
+
 	case 'x':
-		// xref table
+		// xref table §7.5.4
 		println("xref table")
 	default:
 		panic(file.mmap[xrefOffset])
@@ -83,4 +147,13 @@ func (file *File) loadReferences() error {
 	// println(string(file.mmap[xrefOffset : xrefOffset+200]))
 
 	return nil
+}
+
+func bytesToInt(bytesOfInt []byte) int {
+	value := 0
+	for i, b := range bytesOfInt {
+		shift := len(bytesOfInt) - i - 1
+		value += int(b) << uint(8*shift)
+	}
+	return value
 }
