@@ -1,7 +1,9 @@
 all:
 	go fmt ./...
 	go install -v github.com/nathankerr/pdf
-	pdf PDF32000_2008.pdf
+	#pdf PDF32000_2008.pdf
+	rm -f h7*.pdf
+	go run examples/h7.go
 
 test:
 	go test -i github.com/nathankerr/pdf/file

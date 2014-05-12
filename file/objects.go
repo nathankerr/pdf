@@ -1,5 +1,9 @@
 package file
 
+import (
+	"io"
+)
+
 /* Object can be one of the basic PDF types:
 - Boolean §7.3.2
 - Integer §7.3.3
@@ -11,7 +15,9 @@ package file
 - Stream §7.3.8
 - Null §7.3.9
 */
-type Object interface{}
+type Object interface {
+	io.WriterTo
+}
 
 type Boolean bool
 type Integer int

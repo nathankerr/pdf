@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/juju/errgo"
 	"github.com/nathankerr/pdf/file"
 	"log"
 	"os"
@@ -17,7 +18,8 @@ func main() {
 
 	pdf, err := file.Open(filename)
 	if err != nil {
-		log.Fatalf("%s: %s\n", filename, err)
+		// log.Fatalf("%s: %s\n", filename, err)
+		log.Fatalln(errgo.Details(err))
 	}
 
 	err = pdf.Close()
