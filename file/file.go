@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/edsrzf/mmap-go"
 	"os"
+	"github.com/juju/errgo"
 )
 
 type File struct {
@@ -21,21 +22,24 @@ func Open(filename string) (*File, error) {
 	var err error
 	file.file, err = os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 
 	file.mmap, err = mmap.Map(file.file, mmap.RDONLY, 0)
 	if err != nil {
-		return nil, err
+		file.Close()
+		return nil, errgo.Mask(err)
 	}
 
 	// check pdf file header
 	if !bytes.Equal(file.mmap[:7], []byte("%PDF-1.")) {
-		return nil, errors.New("file does not have PDF header")
+		file.Close()
+		return nil, errgo.New("file does not have PDF header")
 	}
 
 	err = file.loadReferences()
 	if err != nil {
+		file.Close()
 		return nil, err
 	}
 

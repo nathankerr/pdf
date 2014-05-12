@@ -31,7 +31,7 @@ type Trailer struct {
 // type 2 not in cross-reference table
 type CrossReference [3]int
 
-type CrossReferences map[string]CrossReference
+type CrossReferences map[Integer]CrossReference
 
 // handles cross-references
 func (file *File) loadReferences() error {
@@ -77,14 +77,11 @@ func (file *File) loadReferences() error {
 		if err != nil {
 			return err
 		}
-		// fmt.Printf("%v\n", xrstream.Stream)
-		// fmt.Printf("%v\n", stream)
 
 		w := xrstream.Dictionary[Name("W")].(Array)
-		wi := []int{}
-
 		size := int(xrstream.Dictionary[Name("Size")].(Integer))
 
+		wi := []int{}
 		stride := 0
 		for _, integer := range w {
 			stride += int(integer.(Integer))
