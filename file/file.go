@@ -17,6 +17,8 @@ type File struct {
 
 	xrefs   map[Integer]CrossReference // existing objects
 	objects []IndirectObject           // new objects
+	prev    Integer
+	Trailer Dictionary
 }
 
 func Open(filename string) (*File, error) {
@@ -54,6 +56,7 @@ func Open(filename string) (*File, error) {
 func Create(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
+		Trailer:  Dictionary{},
 	}
 
 	// create enough of the pdf so that
@@ -146,12 +149,6 @@ func (f *File) Save() error {
 
 	xrefs[0] = CrossReference{0, 0, 65535}
 
-	// include previous references
-	// FIXME: handle this with a Prev in the trailer
-	for objnum, xref := range f.xrefs {
-		xrefs[objnum] = xref
-	}
-
 	for i := range f.objects {
 		// fmt.Println("writing object", i, "at", offset)
 		xrefs[Integer(f.objects[i].ObjectNumber)] = CrossReference{1, int(offset - 1), int(f.objects[i].GenerationNumber)}
@@ -174,34 +171,77 @@ func (f *File) Save() error {
 	}
 	objects.Sort()
 
+	// group into consecutive sets
+	groups := []sort.IntSlice{}
+	groupStart := 0
+	for i := range objects {
+		if i == 0 {
+			continue
+		}
+
+		if objects[i] != objects[i-1]+1 {
+			if groupStart+i-1 == groupStart {
+				// handle single length groups
+				groups = append(groups, objects[groupStart:groupStart+1])
+			} else {
+				groups = append(groups, objects[groupStart:groupStart+i-1])
+			}
+			groupStart = i
+		}
+	}
+	// add remaining group
+	groups = append(groups, objects[groupStart:])
+
 	// FIXME: this is not really a good way to generate an xref table
 	// for example, grouping is not done
-	fmt.Fprintf(file, "xref\n0 %d\n", len(xrefs)+1)
+	fmt.Fprintf(file, "xref\n")
 	// for _, xref := range xrefs {
-	for _, objectNumber := range objects {
-		xref := xrefs[Integer(objectNumber)]
-		fmt.Fprintf(file, "%010d %05d ", xref[1], xref[2])
-		switch xref[0] {
-		case 0:
-			// f entries
-			fmt.Fprintf(file, "f\n")
-		case 1:
-			// n entries
-			fmt.Fprintf(file, "n\n")
-		case 2:
-			panic("can't be in xref table")
-		default:
-			panic("unhandled case")
+	for _, group := range groups {
+		fmt.Fprintf(file, "%d %d\n", group[0], len(group))
+		for _, objectNumber := range group {
+			xref := xrefs[Integer(objectNumber)]
+			fmt.Fprintf(file, "%010d %05d ", xref[1], xref[2])
+			switch xref[0] {
+			case 0:
+				// f entries
+				fmt.Fprintf(file, "f\n")
+			case 1:
+				// n entries
+				fmt.Fprintf(file, "n\n")
+			case 2:
+				panic("can't be in xref table")
+			default:
+				panic("unhandled case")
+			}
 		}
 	}
 
 	fmt.Fprintf(file, "\ntrailer\n")
 	trailer := Dictionary{
-		Name("Size"): Integer(len(xrefs) + 1),
-		Name("Root"): ObjectReference{
-			ObjectNumber: 1,
-		}, // TODO: figure out how to actually handle root
+	// Name("Size"): Integer(len(xrefs) + 1),
+	// Name("Root"): ObjectReference{
+	// 	ObjectNumber: 1,
+	// }, // TODO: figure out how to actually handle root
 	}
+
+	root, ok := f.Trailer[Name("Root")]
+	if ok {
+		trailer[Name("Root")] = root
+	}
+
+	// Figure out the highest object number to set Size properly
+	maxObjNum := Integer(objects[len(objects)-1])
+	for objNum := range f.xrefs {
+		if objNum > maxObjNum {
+			maxObjNum = objNum
+		}
+	}
+	trailer[Name("Size")] = maxObjNum + 1
+
+	if f.prev != 0 {
+		trailer[Name("Prev")] = f.prev
+	}
+
 	_, err = trailer.WriteTo(file)
 	if err != nil {
 		return errgo.Mask(err)

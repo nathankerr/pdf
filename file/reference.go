@@ -65,6 +65,7 @@ func (file *File) loadReferences() error {
 		return err
 	}
 	xrefOffset := int(xrefOffset64)
+	file.prev = Integer(xrefOffset)
 
 	switch file.mmap[xrefOffset] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -79,6 +80,8 @@ func (file *File) loadReferences() error {
 		if err != nil {
 			return err
 		}
+
+		file.Trailer = xrstream.Dictionary
 
 		w := xrstream.Dictionary[Name("W")].(Array)
 		size := int(xrstream.Dictionary[Name("Size")].(Integer))
@@ -146,6 +149,22 @@ func (file *File) loadReferences() error {
 		i += n
 
 		file.xrefs, n = parseXrefBlock(file.mmap[i:])
+		i += n
+
+		token, n = nextToken(file.mmap[i:])
+		if string(token) != "trailer" {
+			log.Fatalln("offset:", i, "could not match trailer, got", string(token))
+		}
+		i += n
+
+		trailer, n, err := parseObject(file.mmap[i:])
+		if err != nil {
+			fmt.Println("XREF TRAILER:", err)
+		}
+		i += n
+
+		file.Trailer = trailer.(Dictionary)
+
 	default:
 		fmt.Println(xrefOffset)
 		println(string(file.mmap[xrefOffset : xrefOffset+20]))
@@ -188,7 +207,7 @@ func parseXrefBlock(slice []byte) (CrossReferences, int) {
 	}
 	i += n
 
-	for j := 0; j < int(nObjects)-1; j++ {
+	for j := 0; j < int(nObjects); j++ {
 		// offset
 		token, n = nextToken(slice[i:])
 		offset, err := strconv.ParseUint(string(token), 10, 64)

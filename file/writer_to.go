@@ -77,6 +77,7 @@ func (a Array) WriteTo(w io.Writer) (int64, error) {
 		obj.WriteTo(buf)
 		buf.WriteByte(' ')
 	}
+	buf.Truncate(buf.Len() - 1)
 	buf.WriteByte(']')
 
 	return buf.WriteTo(w)
