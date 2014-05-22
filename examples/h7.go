@@ -11,7 +11,7 @@ func main() {
 
 	createMinimalFile()
 	stage1()
-	// stage2()
+	stage2()
 	// stage3()
 	// stage4()
 	log.Printf("done")
@@ -209,6 +209,28 @@ func stage1() {
 			pdf.Name("Contents"): pdf.String("Text #4"),
 			pdf.Name("Open"):     pdf.Boolean(false),
 		},
+	})
+
+	err = minimal.Save()
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+}
+
+// Stage 2: Modify Text of One Annotation
+func stage2() {
+	log.Println("stage 2")
+
+	minimal, err := pdf.Open("h7-minimal.pdf")
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+
+	annotation := minimal.Get(pdf.ObjectReference{ObjectNumber: 10}).(pdf.Dictionary)
+	annotation[pdf.Name("Contents")] = pdf.String("Modified Text #3")
+	minimal.Add(pdf.IndirectObject{
+		ObjectNumber: 10,
+		Object:       annotation,
 	})
 
 	err = minimal.Save()

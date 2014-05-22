@@ -148,14 +148,16 @@ func (file *File) loadReferences() error {
 		}
 		i += n
 
-		file.xrefs, n = parseXrefBlock(file.mmap[i:])
-		i += n
+		for {
+			token, n := nextToken(file.mmap[i:])
+			if string(token) == "trailer" {
+				i += n
+				break
+			}
 
-		token, n = nextToken(file.mmap[i:])
-		if string(token) != "trailer" {
-			log.Fatalln("offset:", i, "could not match trailer, got", string(token))
+			file.xrefs, n = parseXrefBlock(file.mmap[i:])
+			i += n
 		}
-		i += n
 
 		trailer, n, err := parseObject(file.mmap[i:])
 		if err != nil {
