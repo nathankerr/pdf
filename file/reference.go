@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 )
 
@@ -59,10 +60,11 @@ func (file *File) loadReferences() error {
 	}
 	xrefEnd += xrefStart + 1
 
-	xrefOffset, err := strconv.ParseUint(string(file.mmap[xrefStart:xrefEnd]), 10, 64)
+	xrefOffset64, err := strconv.ParseUint(string(file.mmap[xrefStart:xrefEnd]), 10, 64)
 	if err != nil {
 		return err
 	}
+	xrefOffset := int(xrefOffset64)
 
 	switch file.mmap[xrefOffset] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -129,14 +131,24 @@ func (file *File) loadReferences() error {
 			}
 		}
 
-		fmt.Println("Index:", len(stream)%stride, size, indexArrayAsObject, indexes)
+		// fmt.Println("Index:", len(stream)%stride, size, indexArrayAsObject, indexes)
 
 		// fmt.Println("XREF: ", w, stride, len(xrstream.Stream), len(stream), len(stream) % stride, xrstream.Dictionary)
 
 	case 'x':
 		// xref table §7.5.4
-		println("xref table")
+		i := xrefOffset
+
+		token, n := nextToken(file.mmap[i:])
+		if string(token) != "xref" {
+			log.Fatalln("offset: ", i, "could not match xref")
+		}
+		i += n
+
+		file.xrefs, n = parseXrefBlock(file.mmap[i:])
 	default:
+		fmt.Println(xrefOffset)
+		println(string(file.mmap[xrefOffset : xrefOffset+20]))
 		panic(file.mmap[xrefOffset])
 	}
 
@@ -153,4 +165,66 @@ func bytesToInt(bytesOfInt []byte) int {
 		value += int(b) << uint(8*shift)
 	}
 	return value
+}
+
+func parseXrefBlock(slice []byte) (CrossReferences, int) {
+	log.SetFlags(log.Lshortfile)
+	var i int
+	references := CrossReferences{}
+
+	// object number
+	token, n := nextToken(slice[i:])
+	objectNumber, err := strconv.ParseUint(string(token), 10, 64)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	i += n
+
+	// number of objects
+	token, n = nextToken(slice[i:])
+	nObjects, err := strconv.ParseUint(string(token), 10, 64)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	i += n
+
+	for j := 0; j < int(nObjects)-1; j++ {
+		// offset
+		token, n = nextToken(slice[i:])
+		offset, err := strconv.ParseUint(string(token), 10, 64)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		i += n
+
+		// generation number
+		token, n = nextToken(slice[i:])
+		generation, err := strconv.ParseUint(string(token), 10, 64)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		i += n
+
+		// type
+		entryType, n := nextToken(slice[i:])
+		i += n
+
+		var xref CrossReference
+		switch entryType[0] {
+		case 'f':
+			xref[0] = 0
+		case 'n':
+			xref[0] = 1
+		default:
+			panic(string(entryType))
+		}
+
+		xref[1] = int(offset)
+		xref[2] = int(generation)
+
+		references[Integer(objectNumber)] = xref
+		objectNumber++
+	}
+
+	return references, i
 }

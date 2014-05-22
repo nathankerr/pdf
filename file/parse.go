@@ -420,6 +420,11 @@ func parseArray(slice []byte) (Object, int, error) {
 
 	i := 1
 	for i < len(slice) {
+		if isWhitespace(slice[i]) {
+			i++
+			continue
+		}
+
 		if slice[i] == ']' {
 			return array, i + 1, nil
 		}
