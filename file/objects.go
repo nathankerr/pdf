@@ -83,8 +83,8 @@ func (Null) thisIsABasicPDFObject() {}
 // ObjectNumber and GenerationNumbers specified.
 // Indirectly defined in
 type ObjectReference struct {
-	ObjectNumber     uint64 // positive integer
-	GenerationNumber uint64 // non-negative integer
+	ObjectNumber     uint // positive integer
+	GenerationNumber uint // non-negative integer
 }
 
 func (ObjectReference) thisIsABasicPDFObject() {}

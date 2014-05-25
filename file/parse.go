@@ -462,7 +462,7 @@ func parseObjectReference(slice []byte) (Object, int, error) {
 	if !ok {
 		return objref, i, errors.New("expected object number not an integer")
 	}
-	objref.ObjectNumber = uint64(integer)
+	objref.ObjectNumber = uint(integer)
 
 	generationNumber, n, err := parseNumeric(slice[i:])
 	i += n
@@ -473,7 +473,7 @@ func parseObjectReference(slice []byte) (Object, int, error) {
 	if !ok {
 		return objref, i, errors.New("expected generation number not an integer")
 	}
-	objref.GenerationNumber = uint64(integer)
+	objref.GenerationNumber = uint(integer)
 
 	n, ok = match(slice[i:], "R")
 	i += n
@@ -491,19 +491,21 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 
 	// Object Number
 	token, n := nextToken(slice[i:])
-	io.ObjectNumber, err = strconv.ParseUint(string(token), 10, 64)
+	objectNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
 		return io, i, err
 	}
+	io.ObjectNumber = uint(objectNumber)
 
 	// Generation Number
 	token, n = nextToken(slice[i:])
-	io.GenerationNumber, err = strconv.ParseUint(string(token), 10, 64)
+	generationNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
 		return io, i, err
 	}
+	io.GenerationNumber = uint(generationNumber)
 
 	// "obj"
 	n, ok := match(slice[i:], "obj")
