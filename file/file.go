@@ -108,6 +108,10 @@ func (f *File) Get(reference ObjectReference) Object {
 // Add returns the of the object after adding it to the file.
 // An IndirectObject's ObjectReference will be used,
 // otherwise a free ObjectReference will be used.
+//
+// If an IndirectObject's ObjectReference also refers to an existing
+// object, the newly added IndirectObject will mask the existing one.
+// Only the most recently added object will be Saved to disk.
 func (f *File) Add(obj Object) ObjectReference {
 	// TODO: handle non indirect-objects
 	ref := ObjectReference{}
