@@ -4,16 +4,17 @@ import (
 	"io"
 )
 
-// Object can be one of the basic PDF types:
-// - Boolean §7.3.2
-// - Integer §7.3.3
-// - Real §7.3.3
-// - String §7.3.4
-// - Name §7.3.5
-// - Array §7.3.6
-// - Dictionary §7.3.7
-// - Stream §7.3.8
-// - Null §7.3.9
+// Object represents all of the types that can be handled
+// by the file store. Those types (defined in this package) are:
+//   - Boolean
+//   - Integer
+//   - Real
+//   - String
+//   - Name
+//   - Array
+//   - Dictionary
+//   - Stream
+//   - Null
 type Object interface {
 	thisIsABasicPDFObject()
 	io.WriterTo
