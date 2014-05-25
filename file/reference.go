@@ -8,31 +8,13 @@ import (
 	"strconv"
 )
 
-// tables 15, 17, 19
-// §7.5.4 Cross-Reference Table
-// §7.5.5 File Trailer
-// §7.5.8 Cross-Reference Streams
-type Trailer struct {
-	Size    Integer    // required, not an indirect reference
-	Prev    Integer    // present only if the file has more than one cross-reference section
-	Root    Dictionary // required, shall be an indirect reference
-	Encrypt Dictionary // required if document is encrypted; PDF-1.1
-	Info    Dictionary // optional, shall be an indirect reference
-	ID      Array      // required if Encrypt entry is present; optional otherwise; PDF-1.1
-
-	XRefStm Integer // optional
-
-	Index Array // optional
-	W     Array // required
-}
-
-// Table 18 defines the cross-reference stream type
+// CrossReference holds the data described in Table 18
 // type 0 = f entries in cross-reference table
 // type 1 = n entries in cross-reference table
 // type 2 not in cross-reference table
-type CrossReference [3]int
+type crossReference [3]int
 
-type CrossReferences map[Integer]CrossReference
+type crossReferences map[Integer]crossReference
 
 // handles cross-references
 func (file *File) loadReferences() error {
@@ -118,7 +100,7 @@ func (file *File) loadReferences() error {
 			offset := 0
 			for n := 0; n < index.size; n++ {
 				for offset < len(stream) {
-					xref := CrossReference{}
+					xref := crossReference{}
 					ioffset := 0
 					for i := 0; i < 2; i++ {
 						width := wi[i]
@@ -188,10 +170,10 @@ func bytesToInt(bytesOfInt []byte) int {
 	return value
 }
 
-func parseXrefBlock(slice []byte) (CrossReferences, int) {
+func parseXrefBlock(slice []byte) (crossReferences, int) {
 	log.SetFlags(log.Lshortfile)
 	var i int
-	references := CrossReferences{}
+	references := crossReferences{}
 
 	// object number
 	token, n := nextToken(slice[i:])
@@ -230,7 +212,7 @@ func parseXrefBlock(slice []byte) (CrossReferences, int) {
 		entryType, n := nextToken(slice[i:])
 		i += n
 
-		var xref CrossReference
+		var xref crossReference
 		switch entryType[0] {
 		case 'f':
 			xref[0] = 0

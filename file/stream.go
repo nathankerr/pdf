@@ -14,6 +14,7 @@ import (
 // TODO:
 // - file external file processing
 
+// Decode decodes the stream data using the filters in the stream's dictionary.
 func (s Stream) Decode() ([]byte, error) {
 	// extract the list of filters to use
 	filters := []Name{}

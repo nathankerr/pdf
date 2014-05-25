@@ -10,17 +10,19 @@ import (
 	"sort"
 )
 
+// File manages access to objects stored in a PDF file.
 type File struct {
 	filename string
 	file     *os.File
 	mmap     mmap.MMap
 
-	xrefs   map[Integer]CrossReference // existing objects
+	xrefs   map[Integer]crossReference // existing objects
 	objects []IndirectObject           // new objects
 	prev    Integer
 	Trailer Dictionary
 }
 
+// Open opens a PDF file for manipulation of its objects.
 func Open(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
@@ -53,6 +55,7 @@ func Open(filename string) (*File, error) {
 	return file, nil
 }
 
+// Create creates a new PDF file with no objects.
 func Create(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
@@ -71,8 +74,8 @@ func Create(filename string) (*File, error) {
 	return file, nil
 }
 
-// finds the object "object_number generation_number"
-// returns Null when object not found
+// Get returns the referenced object.
+// When the object does not exist, Null is returned.
 func (f *File) Get(reference ObjectReference) Object {
 	for _, obj := range f.objects {
 		if obj.ObjectNumber == reference.ObjectNumber && obj.GenerationNumber == reference.GenerationNumber {
@@ -102,8 +105,11 @@ func (f *File) Get(reference ObjectReference) Object {
 	}
 }
 
-// adds an object to the file, returns the object reference "object_number generation_number"
+// Add returns the of the object after adding it to the file.
+// An IndirectObject's ObjectReference will be used,
+// otherwise a free ObjectReference will be used.
 func (f *File) Add(obj Object) ObjectReference {
+	// TODO: handle non indirect-objects
 	ref := ObjectReference{}
 
 	switch typed := obj.(type) {
@@ -122,9 +128,12 @@ func writeLineBreakTo(w io.Writer) (int64, error) {
 	return int64(n), err
 }
 
-// Writes the objects that have been put into the File to the file.
-// A new object index will be written (taking up space)
-// the File object is still usable after calling this. The effect will be as if the file was newly opened.
+// Save appends the objects that have been added to the File
+// to the file on disk. After saving, the File is still usable
+// and will act as though it were just Open'ed.
+//
+// NOTE: A new object index will be written on each save,
+// taking space in the file on disk
 func (f *File) Save() error {
 	info, err := os.Stat(f.filename)
 	if err != nil {
@@ -145,13 +154,13 @@ func (f *File) Save() error {
 	}
 	offset += n
 
-	xrefs := map[Integer]CrossReference{}
+	xrefs := map[Integer]crossReference{}
 
-	xrefs[0] = CrossReference{0, 0, 65535}
+	xrefs[0] = crossReference{0, 0, 65535}
 
 	for i := range f.objects {
 		// fmt.Println("writing object", i, "at", offset)
-		xrefs[Integer(f.objects[i].ObjectNumber)] = CrossReference{1, int(offset - 1), int(f.objects[i].GenerationNumber)}
+		xrefs[Integer(f.objects[i].ObjectNumber)] = crossReference{1, int(offset - 1), int(f.objects[i].GenerationNumber)}
 		n, err = f.objects[i].WriteTo(file)
 		if err != nil {
 			return errgo.Mask(err)
@@ -192,10 +201,8 @@ func (f *File) Save() error {
 	// add remaining group
 	groups = append(groups, objects[groupStart:])
 
-	// FIXME: this is not really a good way to generate an xref table
-	// for example, grouping is not done
+	// write as an xref table to file
 	fmt.Fprintf(file, "xref\n")
-	// for _, xref := range xrefs {
 	for _, group := range groups {
 		fmt.Fprintf(file, "%d %d\n", group[0], len(group))
 		for _, objectNumber := range group {
@@ -216,14 +223,9 @@ func (f *File) Save() error {
 		}
 	}
 
+	// Write the file trailer
 	fmt.Fprintf(file, "\ntrailer\n")
-	trailer := Dictionary{
-	// Name("Size"): Integer(len(xrefs) + 1),
-	// Name("Root"): ObjectReference{
-	// 	ObjectNumber: 1,
-	// }, // TODO: figure out how to actually handle root
-	}
-
+	trailer := Dictionary{}
 	root, ok := f.Trailer[Name("Root")]
 	if ok {
 		trailer[Name("Root")] = root
@@ -252,6 +254,7 @@ func (f *File) Save() error {
 	return nil
 }
 
+// Close the File, does not Save.
 func (f *File) Close() error {
 	err := f.mmap.Unmap()
 	if err != nil {

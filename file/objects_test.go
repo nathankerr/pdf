@@ -51,7 +51,7 @@ func runTests(t *testing.T, tests []test) {
 // returns nil when equivalent
 func compare(got, expected interface{}) error {
 	if !reflect.DeepEqual(got, expected) {
-		return errors.New(fmt.Sprintf("\nExpected:\n\t%#v\nGot:\n\t%#v", expected, got))
+		return fmt.Errorf("\nExpected:\n\t%#v\nGot:\n\t%#v", expected, got)
 	}
 	return nil
 }

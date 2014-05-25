@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// WriteTo serializes the Boolean according to the rules in
 // §7.3.2
 func (b Boolean) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -19,6 +20,7 @@ func (b Boolean) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Integer according to the rules in
 // §7.3.3
 func (i Integer) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -28,6 +30,7 @@ func (i Integer) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Real according to the rules in
 // §7.3.3
 func (r Real) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -37,6 +40,7 @@ func (r Real) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the String according to the rules in
 // §7.3.4
 func (s String) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -59,6 +63,7 @@ func (s String) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Name according to the rules in
 // §7.3.5
 func (n Name) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -68,6 +73,7 @@ func (n Name) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Array according to the rules in
 // §7.3.6
 func (a Array) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -83,6 +89,7 @@ func (a Array) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Dictionary according to the rules in
 // §7.3.6
 func (d Dictionary) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -98,8 +105,8 @@ func (d Dictionary) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the Stream according to the rules in
 // §7.3.8
-// should always be called from IndirectObject.WriteTo
 func (s Stream) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
 
@@ -112,6 +119,7 @@ func (s Stream) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes Null according to the rules in
 // §7.3.9
 func (null Null) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -121,6 +129,7 @@ func (null Null) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the ObjectReference according to the rules in
 // §7.3.10
 func (objref ObjectReference) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
@@ -130,6 +139,7 @@ func (objref ObjectReference) WriteTo(w io.Writer) (int64, error) {
 	return buf.WriteTo(w)
 }
 
+// WriteTo serializes the IndirectObject according to the rules in
 // §7.3.10
 func (inobj IndirectObject) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}

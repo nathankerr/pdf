@@ -1,5 +1,5 @@
 /*
-Reads PDF files
+Package file manages objects stored in a PDF file.
 
 This package only concerns itself with file-level concerns.
 These include:

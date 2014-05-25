@@ -231,9 +231,8 @@ func parseLiteralString(slice []byte) (Object, int, error) {
 			parens--
 			if parens == 0 {
 				return String(decoded[:decodedIndex]), i + 1, nil
-			} else {
-				include = true
 			}
+			include = true
 		case '\n':
 			if slice[i-1] == '\\' {
 				decodedIndex--

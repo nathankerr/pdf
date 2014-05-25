@@ -31,7 +31,7 @@ func createMinimalFile() {
 
 	// catalog
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 1,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 1},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"): pdf.Name("Catalog"),
 			pdf.Name("Outlines"): pdf.ObjectReference{
@@ -45,7 +45,7 @@ func createMinimalFile() {
 
 	// outlines
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 2,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 2},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"):  pdf.Name("Outlines"),
 			pdf.Name("Count"): pdf.Integer(0),
@@ -54,7 +54,7 @@ func createMinimalFile() {
 
 	// pages
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 3,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 3},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"): pdf.Name("Pages"),
 			pdf.Name("Kids"): pdf.Array{
@@ -68,7 +68,7 @@ func createMinimalFile() {
 
 	// page
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 4,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 4},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"): pdf.Name("Page"),
 			pdf.Name("Parent"): pdf.ObjectReference{
@@ -93,7 +93,7 @@ func createMinimalFile() {
 
 	// content stream
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 5,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 5},
 		Object: pdf.Stream{
 			Dictionary: pdf.Dictionary{
 				pdf.Name("Length"): pdf.Integer(0),
@@ -103,7 +103,7 @@ func createMinimalFile() {
 
 	// procset
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 6,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 6},
 		Object: pdf.Array{
 			pdf.Name("PDF"),
 		},
@@ -128,13 +128,13 @@ func stage1() {
 	page := minimal.Get(pdf.ObjectReference{ObjectNumber: 4}).(pdf.Dictionary)
 	page[pdf.Name("Annots")] = pdf.ObjectReference{ObjectNumber: 7}
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 4,
-		Object:       page,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 4},
+		Object:          page,
 	})
 
 	// annotation array
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 7,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 7},
 		Object: pdf.Array{
 			pdf.ObjectReference{ObjectNumber: 8},
 			pdf.ObjectReference{ObjectNumber: 9},
@@ -145,7 +145,7 @@ func stage1() {
 
 	// annotation
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 8,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 8},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"):    pdf.Name("Annot"),
 			pdf.Name("Subtype"): pdf.Name("Text"),
@@ -162,7 +162,7 @@ func stage1() {
 
 	// annotation
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 9,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 9},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"):    pdf.Name("Annot"),
 			pdf.Name("Subtype"): pdf.Name("Text"),
@@ -179,7 +179,7 @@ func stage1() {
 
 	// annotation
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 10,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 10},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"):    pdf.Name("Annot"),
 			pdf.Name("Subtype"): pdf.Name("Text"),
@@ -196,7 +196,7 @@ func stage1() {
 
 	// annotation
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 11,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 11},
 		Object: pdf.Dictionary{
 			pdf.Name("Type"):    pdf.Name("Annot"),
 			pdf.Name("Subtype"): pdf.Name("Text"),
@@ -229,8 +229,8 @@ func stage2() {
 	annotation := minimal.Get(pdf.ObjectReference{ObjectNumber: 10}).(pdf.Dictionary)
 	annotation[pdf.Name("Contents")] = pdf.String("Modified Text #3")
 	minimal.Add(pdf.IndirectObject{
-		ObjectNumber: 10,
-		Object:       annotation,
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 10},
+		Object:          annotation,
 	})
 
 	err = minimal.Save()
