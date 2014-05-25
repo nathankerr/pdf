@@ -32,7 +32,7 @@ func (i Integer) WriteTo(w io.Writer) (int64, error) {
 func (r Real) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
 
-	fmt.Fprintf(buf, "%d", float64(r))
+	fmt.Fprintf(buf, "%v", float64(r))
 
 	return buf.WriteTo(w)
 }
