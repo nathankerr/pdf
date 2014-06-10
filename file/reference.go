@@ -12,7 +12,10 @@ import (
 // type 0 = f entries in cross-reference table
 // type 1 = n entries in cross-reference table
 // type 2 not in cross-reference table
-type crossReference [3]int
+// 0 number_of_next_free_object generation_number_if_used_again
+// 1 byte_offset_of_object generation_number
+// 2 object_number_of_object_stream_containing_this_object index_of_this_object_in_object_stream
+type crossReference [3]uint
 
 type crossReferences map[Integer]crossReference
 
@@ -115,7 +118,7 @@ func (file *File) loadReferences() error {
 					for i := 0; i < 2; i++ {
 						width := wi[i]
 						start := offset + ioffset
-						xref[i] = bytesToInt(stream[start : start+width])
+						xref[i] = uint(bytesToInt(stream[start : start+width]))
 						ioffset += width
 					}
 					fmt.Println(objectNumber, xref)
@@ -147,7 +150,10 @@ func (file *File) loadReferences() error {
 				break
 			}
 
-			file.xrefs, n = parseXrefBlock(file.mmap[i:])
+			xrefs, n := parseXrefBlock(file.mmap[i:])
+			for objectNumber, xref := range xrefs {
+				file.objects[uint(objectNumber)] = xref
+			}
 			i += n
 		}
 
@@ -232,8 +238,8 @@ func parseXrefBlock(slice []byte) (crossReferences, int) {
 			panic(string(entryType))
 		}
 
-		xref[1] = int(offset)
-		xref[2] = int(generation)
+		xref[1] = uint(offset)
+		xref[2] = uint(generation)
 
 		references[Integer(objectNumber)] = xref
 		objectNumber++

@@ -7,8 +7,11 @@ import (
 	"github.com/juju/errgo"
 	"io"
 	"os"
+	"reflect"
 	"sort"
 )
+
+type freeObject uint // generation number for next use of the object number where this is stored
 
 // File manages access to objects stored in a PDF file.
 type File struct {
@@ -16,8 +19,15 @@ type File struct {
 	file     *os.File
 	mmap     mmap.MMap
 
-	xrefs   map[Integer]crossReference // existing objects
-	objects []IndirectObject           // new objects
+	// cross reference for existing objects
+	// indirect object for new objects
+	// free object for newly freed objects
+	// map key is the object number
+	// make sure generation number is >= existing generation number when modifying
+	objects  map[uint]interface{}
+	nextFree uint // object number of next free object
+	size     uint // max object number + 1
+
 	prev    Integer
 	Trailer Dictionary
 }
@@ -26,6 +36,7 @@ type File struct {
 func Open(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
+		objects:  map[uint]interface{}{},
 	}
 
 	var err error
@@ -60,6 +71,7 @@ func Create(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
 		Trailer:  Dictionary{},
+		objects:  map[uint]interface{}{},
 	}
 
 	// create enough of the pdf so that
@@ -77,42 +89,47 @@ func Create(filename string) (*File, error) {
 // Get returns the referenced object.
 // When the object does not exist, Null is returned.
 func (f *File) Get(reference ObjectReference) Object {
-	for _, obj := range f.objects {
-		if obj.ObjectNumber == reference.ObjectNumber && obj.GenerationNumber == reference.GenerationNumber {
-			return obj
-		}
-	}
-
-	xref, ok := f.xrefs[Integer(reference.ObjectNumber)]
+	object, ok := f.objects[reference.ObjectNumber]
 	if !ok {
 		return Null{}
 	}
 
-	switch xref[0] {
-	case 0: // free entry
-		return Null{}
-	case 1: // normal
-		offset := xref[1] - 1
-		obj, _, err := parseIndirectObject(f.mmap[offset:])
-		if err != nil {
-			fmt.Println("file.Get:", err)
+	switch typed := object.(type) {
+	case crossReference: // existing object
+		switch typed[0] {
+		case 0: // free entry
+			return Null{}
+		case 1: // normal
+			offset := typed[1] - 1
+			obj, _, err := parseIndirectObject(f.mmap[offset:])
+			if err != nil {
+				fmt.Println("file.Get:", err)
+			}
+			return obj.(IndirectObject).Object
+		case 2: // in object stream
+			panic("object streams not yet supported")
+		default:
+			panic(typed[0])
 		}
-		return obj.(IndirectObject).Object
-	case 2: // in object stream
-		panic("object streams not yet supported")
+	case IndirectObject: // new object
+		return typed.Object
+	case freeObject: // newly freed object
+		return Null{}
 	default:
-		panic(xref[0])
+		panic("unhandled type: " + reflect.TypeOf(object).Name())
 	}
 }
 
-// Add returns the of the object after adding it to the file.
+// Add returns the object reference of the object after adding it to the file.
 // An IndirectObject's ObjectReference will be used,
 // otherwise a free ObjectReference will be used.
 //
 // If an IndirectObject's ObjectReference also refers to an existing
 // object, the newly added IndirectObject will mask the existing one.
 // Only the most recently added object will be Saved to disk.
-func (f *File) Add(obj Object) ObjectReference {
+// GenerationNumber must be greater than or equal to the largest existing
+// GenerationNumber for that ObjectNumber.
+func (f *File) Add(obj Object) (ObjectReference, error) {
 	// TODO: handle non indirect-objects
 	ref := ObjectReference{}
 
@@ -120,11 +137,46 @@ func (f *File) Add(obj Object) ObjectReference {
 	case IndirectObject:
 		ref.ObjectNumber = typed.ObjectNumber
 		ref.GenerationNumber = typed.GenerationNumber
-		f.objects = append(f.objects, typed)
+
+		// check to see if the generation number works
+		existing, ok := f.objects[ref.ObjectNumber]
+		if ok {
+			// determine the minimum allowed generation number
+			var minGenerationNumber uint = 0
+			switch typed := existing.(type) {
+			case crossReference: // existing object
+				switch typed[0] {
+				case 0: // free entry
+					minGenerationNumber = typed[2]
+				case 1: // normal
+					minGenerationNumber = typed[2]
+				case 2: // in object stream
+					// objects in object streams must have a
+					// generation number of 0
+					minGenerationNumber = 0
+				default:
+					panic(typed[0])
+				}
+			case IndirectObject: // new object
+				minGenerationNumber = typed.GenerationNumber
+			case freeObject: // newly freed object
+				minGenerationNumber = uint(typed)
+			default:
+				panic("unhandled type: " + reflect.TypeOf(typed).Name())
+			}
+
+			if ref.GenerationNumber < minGenerationNumber {
+				// TODO: make better error
+				ref.GenerationNumber = minGenerationNumber
+				return ref, errgo.New("Generation number is too small...")
+			}
+		}
+
+		f.objects[ref.ObjectNumber] = typed
 	default:
 		panic(obj)
 	}
-	return ref
+	return ref, nil
 }
 
 func writeLineBreakTo(w io.Writer) (int64, error) {
@@ -164,18 +216,28 @@ func (f *File) Save() error {
 
 	for i := range f.objects {
 		// fmt.Println("writing object", i, "at", offset)
-		xrefs[Integer(f.objects[i].ObjectNumber)] = crossReference{1, int(offset - 1), int(f.objects[i].GenerationNumber)}
-		n, err = f.objects[i].WriteTo(file)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-		offset += n
+		switch typed := f.objects[i].(type) {
+		case crossReference:
+			// no-op, don't need to write unchanged objects to file
+		case IndirectObject:
+			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
+			n, err = typed.WriteTo(file)
+			if err != nil {
+				return errgo.Mask(err)
+			}
+			offset += n
 
-		n, err = writeLineBreakTo(file)
-		if err != nil {
-			return errgo.Mask(err)
+			n, err = writeLineBreakTo(file)
+			if err != nil {
+				return errgo.Mask(err)
+			}
+			offset += n
+		case freeObject:
+			// TODO: free object linked list (second column)
+			xrefs[Integer(i)] = crossReference{0, 0, uint(typed)}
+		default:
+			panic("unhandled type: " + reflect.TypeOf(typed).Name())
 		}
-		offset += n
 	}
 
 	objects := make(sort.IntSlice, 0, len(xrefs))
@@ -236,13 +298,13 @@ func (f *File) Save() error {
 	}
 
 	// Figure out the highest object number to set Size properly
-	maxObjNum := Integer(objects[len(objects)-1])
-	for objNum := range f.xrefs {
+	var maxObjNum uint
+	for objNum := range f.objects {
 		if objNum > maxObjNum {
 			maxObjNum = objNum
 		}
 	}
-	trailer[Name("Size")] = maxObjNum + 1
+	trailer[Name("Size")] = Integer(maxObjNum + 1)
 
 	if f.prev != 0 {
 		trailer[Name("Prev")] = f.prev
