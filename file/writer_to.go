@@ -48,8 +48,6 @@ func (s String) WriteTo(w io.Writer) (int64, error) {
 	buf.WriteByte('(')
 	for _, b := range []byte(s) {
 		switch b {
-		case '\\':
-			buf.WriteString("\\\\")
 		case '(':
 			buf.WriteString("\\(")
 		case ')':

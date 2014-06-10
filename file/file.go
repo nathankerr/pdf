@@ -310,10 +310,7 @@ func (f *File) Save() error {
 	// Write the file trailer
 	fmt.Fprintf(file, "\ntrailer\n")
 	trailer := Dictionary{}
-	root, ok := f.Trailer[Name("Root")]
-	if ok {
-		trailer[Name("Root")] = root
-	}
+	trailer[Name("Root")] = f.Root
 
 	// Figure out the highest object number to set Size properly
 	var maxObjNum uint

@@ -13,7 +13,7 @@ func main() {
 	stage1()
 	stage2()
 	stage3()
-	// stage4()
+	stage4()
 	log.Printf("done")
 }
 
@@ -108,6 +108,8 @@ func createMinimalFile() {
 			pdf.Name("PDF"),
 		},
 	})
+
+	minimal.Root = pdf.ObjectReference{ObjectNumber: 1}
 
 	err = minimal.Save()
 	if err != nil {
@@ -261,6 +263,93 @@ func stage3() {
 
 	minimal.Free(8)
 	minimal.Free(9)
+
+	err = minimal.Save()
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+}
+
+// Stage 4: Add Three Annotations
+func stage4() {
+	log.Println("stage 4")
+
+	minimal, err := pdf.Open("h7-minimal.pdf")
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+
+	annotationsObj := minimal.Get(pdf.ObjectReference{ObjectNumber: 7})
+	annotations := annotationsObj.(pdf.Array)
+
+	// annotation 8 1
+	ref, err := minimal.Add(pdf.IndirectObject{
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 8, GenerationNumber: 1},
+		Object: pdf.Dictionary{
+			pdf.Name("Type"):    pdf.Name("Annot"),
+			pdf.Name("Subtype"): pdf.Name("Text"),
+			pdf.Name("Rect"): pdf.Array{
+				pdf.Integer(58),
+				pdf.Integer(657),
+				pdf.Integer(172),
+				pdf.Integer(742),
+			},
+			pdf.Name("Contents"): pdf.String("New Text #1"),
+			pdf.Name("Open"):     pdf.Boolean(true),
+		},
+	})
+	if err != nil {
+		log.Fatal(errgo.Details(err))
+	}
+	annotations = append(annotations, ref)
+
+	// annotation 9 1
+	ref, err = minimal.Add(pdf.IndirectObject{
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 9, GenerationNumber: 1},
+		Object: pdf.Dictionary{
+			pdf.Name("Type"):    pdf.Name("Annot"),
+			pdf.Name("Subtype"): pdf.Name("Text"),
+			pdf.Name("Rect"): pdf.Array{
+				pdf.Integer(389),
+				pdf.Integer(459),
+				pdf.Integer(570),
+				pdf.Integer(537),
+			},
+			pdf.Name("Contents"): pdf.String("New Text #2"),
+			pdf.Name("Open"):     pdf.Boolean(false),
+		},
+	})
+	if err != nil {
+		log.Fatal(errgo.Details(err))
+	}
+	annotations = append(annotations, ref)
+
+	// annotation 12 0
+	ref, err = minimal.Add(pdf.IndirectObject{
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 12},
+		Object: pdf.Dictionary{
+			pdf.Name("Type"):    pdf.Name("Annot"),
+			pdf.Name("Subtype"): pdf.Name("Text"),
+			pdf.Name("Rect"): pdf.Array{
+				pdf.Integer(44),
+				pdf.Integer(253),
+				pdf.Integer(473),
+				pdf.Integer(337),
+			},
+			pdf.Name("Contents"): pdf.String("New Text #3\\203a longer text annotation which we will continue \\\nonto a second line"),
+			pdf.Name("Open"):     pdf.Boolean(true),
+		},
+	})
+	if err != nil {
+		log.Fatal(errgo.Details(err))
+	}
+	annotations = append(annotations, ref)
+
+	// update the annotations array
+	minimal.Add(pdf.IndirectObject{
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 7},
+		Object:          annotations,
+	})
 
 	err = minimal.Save()
 	if err != nil {
