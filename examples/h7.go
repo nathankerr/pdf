@@ -12,7 +12,7 @@ func main() {
 	createMinimalFile()
 	stage1()
 	stage2()
-	// stage3()
+	stage3()
 	// stage4()
 	log.Printf("done")
 }
@@ -232,6 +232,35 @@ func stage2() {
 		ObjectReference: pdf.ObjectReference{ObjectNumber: 10},
 		Object:          annotation,
 	})
+
+	err = minimal.Save()
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+}
+
+// Stage 3: Delete Two Annotations
+func stage3() {
+	log.Println("stage 3")
+
+	minimal, err := pdf.Open("h7-minimal.pdf")
+	if err != nil {
+		log.Fatalln(errgo.Details(err))
+	}
+
+	// log.Println("minimal:", minimal)
+
+	// annotation array
+	minimal.Add(pdf.IndirectObject{
+		ObjectReference: pdf.ObjectReference{ObjectNumber: 7},
+		Object: pdf.Array{
+			pdf.ObjectReference{ObjectNumber: 10},
+			pdf.ObjectReference{ObjectNumber: 11},
+		},
+	})
+
+	minimal.Free(8)
+	minimal.Free(9)
 
 	err = minimal.Save()
 	if err != nil {

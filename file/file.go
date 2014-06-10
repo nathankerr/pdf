@@ -30,6 +30,12 @@ type File struct {
 
 	prev    Integer
 	Trailer Dictionary
+
+	// things from trailer that should be exported
+	Root    ObjectReference
+	Encrypt Dictionary
+	Info    Dictionary
+	ID      Array
 }
 
 // Open opens a PDF file for manipulation of its objects.
@@ -214,11 +220,15 @@ func (f *File) Save() error {
 
 	xrefs[0] = crossReference{0, 0, 65535}
 
+	free := sort.IntSlice{}
 	for i := range f.objects {
-		// fmt.Println("writing object", i, "at", offset)
 		switch typed := f.objects[i].(type) {
 		case crossReference:
 			// no-op, don't need to write unchanged objects to file
+			// however, we do need to handle the free list
+			if typed[0] == 0 {
+				free = append(free, int(i))
+			}
 		case IndirectObject:
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
 			n, err = typed.WriteTo(file)
@@ -233,11 +243,19 @@ func (f *File) Save() error {
 			}
 			offset += n
 		case freeObject:
-			// TODO: free object linked list (second column)
 			xrefs[Integer(i)] = crossReference{0, 0, uint(typed)}
+			free = append(free, int(i))
 		default:
 			panic("unhandled type: " + reflect.TypeOf(typed).Name())
 		}
+	}
+
+	// fill in the free linked list
+	free.Sort()
+	for i := 0; i < free.Len()-1; i++ {
+		xref := xrefs[Integer(free[i])]
+		xref[1] = uint(free[i+1])
+		xrefs[Integer(free[i])] = xref
 	}
 
 	objects := make(sort.IntSlice, 0, len(xrefs))
@@ -333,4 +351,36 @@ func (f *File) Close() error {
 	}
 
 	return nil
+}
+
+func (f *File) Free(objectNumber uint) {
+	obj, ok := f.objects[objectNumber]
+	if !ok {
+		// object does not exist, and therefore is already free
+		return
+	}
+
+	switch typed := obj.(type) {
+	case crossReference: // existing object
+		switch typed[0] {
+		case 0: // free entry
+			// no-op
+			// the object is already free
+		case 1: // normal
+			f.objects[objectNumber] = freeObject(typed[2] + 1)
+		case 2: // in object stream
+			// objects in object streams must have a
+			// generation number of 0
+			f.objects[objectNumber] = freeObject(1)
+		default:
+			panic(typed[0])
+		}
+	case IndirectObject: // new object
+		f.objects[objectNumber] = freeObject(typed.GenerationNumber + 1)
+	case freeObject: // newly freed object
+		// no-op
+		// already free
+	default:
+		panic("unhandled type: " + reflect.TypeOf(typed).Name())
+	}
 }

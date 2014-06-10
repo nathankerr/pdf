@@ -60,23 +60,64 @@ func (file *File) loadReferences() error {
 		return err
 	}
 	xrefOffset := int(xrefOffset64)
+
+	refs, trailer, err := file.load_references(xrefOffset)
+	if err != nil {
+		return err
+	}
+
 	file.prev = Integer(xrefOffset)
+	file.objects = refs
+
+	root := trailer[Name("Root")]
+	if root != nil {
+		file.Root = root.(ObjectReference)
+	}
+
+	encrypt := trailer[Name("Encrypt")]
+	if encrypt != nil {
+		file.Encrypt = encrypt.(Dictionary)
+	}
+
+	info := trailer[Name("Info")]
+	if info != nil {
+		file.Info = info.(Dictionary)
+	}
+
+	id := trailer[Name("ID")]
+	if id != nil {
+		file.ID = id.(Array)
+	}
+
+	// println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)
+	// println(string(file.mmap[xrefOffset : xrefOffset+200]))
+
+	return nil
+}
+
+// parse and recursively load and merge references and trailer
+func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Dictionary, error) {
+	// fmt.Println("load_references", xrefOffset)
+
+	// parse refs, trailer
+	refs := map[uint]interface{}{}
+	var trailer Dictionary
 
 	switch file.mmap[xrefOffset] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		// indirect object and therefore a cross-reference stream §7.5.8
-		xrstreamAsObject, _, err := parseIndirectObject(file.mmap[xrefOffset:eofOffset])
+		xrstreamAsObject, _, err := parseIndirectObject(file.mmap[xrefOffset:])
 		if err != nil {
-			return err
+			return refs, trailer, err
 		}
 		xrstream := xrstreamAsObject.(IndirectObject).Object.(Stream)
 
 		stream, err := xrstream.Decode()
 		if err != nil {
-			return err
+			return refs, trailer, err
 		}
 
-		file.Trailer = xrstream.Dictionary
+		trailer = xrstream.Dictionary
 
 		w := xrstream.Dictionary[Name("W")].(Array)
 		size := int(xrstream.Dictionary[Name("Size")].(Integer))
@@ -121,17 +162,12 @@ func (file *File) loadReferences() error {
 						xref[i] = uint(bytesToInt(stream[start : start+width]))
 						ioffset += width
 					}
-					fmt.Println(objectNumber, xref)
 
 					objectNumber++
 					offset += stride
 				}
 			}
 		}
-
-		// fmt.Println("Index:", len(stream)%stride, size, indexArrayAsObject, indexes)
-
-		// fmt.Println("XREF: ", w, stride, len(xrstream.Stream), len(stream), len(stream) % stride, xrstream.Dictionary)
 
 	case 'x':
 		// xref table §7.5.4
@@ -152,18 +188,18 @@ func (file *File) loadReferences() error {
 
 			xrefs, n := parseXrefBlock(file.mmap[i:])
 			for objectNumber, xref := range xrefs {
-				file.objects[uint(objectNumber)] = xref
+				refs[uint(objectNumber)] = xref
 			}
 			i += n
 		}
 
-		trailer, n, err := parseObject(file.mmap[i:])
+		trailerObj, n, err := parseObject(file.mmap[i:])
 		if err != nil {
 			fmt.Println("XREF TRAILER:", err)
 		}
 		i += n
 
-		file.Trailer = trailer.(Dictionary)
+		trailer = trailerObj.(Dictionary)
 
 	default:
 		fmt.Println(xrefOffset)
@@ -171,10 +207,29 @@ func (file *File) loadReferences() error {
 		panic(file.mmap[xrefOffset])
 	}
 
-	// println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)
-	// println(string(file.mmap[xrefOffset : xrefOffset+200]))
+	prev, has_prev := trailer[Name("Prev")]
+	if has_prev {
+		prev_refs, prev_trailer, err := file.load_references(int(prev.(Integer)))
+		if err != nil {
+			return refs, trailer, err
+		}
 
-	return nil
+		for prev_ref := range prev_refs {
+			if _, ok := refs[prev_ref]; !ok {
+				refs[prev_ref] = prev_refs[prev_ref]
+			}
+		}
+
+		for name := range prev_trailer {
+			if _, ok := trailer[name]; !ok {
+				trailer[name] = prev_trailer[name]
+			}
+		}
+	}
+
+	// TODO: hybrid
+
+	return refs, trailer, nil
 }
 
 func bytesToInt(bytesOfInt []byte) int {
