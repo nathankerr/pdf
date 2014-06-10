@@ -207,6 +207,7 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 		panic(file.mmap[xrefOffset])
 	}
 
+	// previous references are masked by the current one
 	prev, has_prev := trailer[Name("Prev")]
 	if has_prev {
 		prev_refs, prev_trailer, err := file.load_references(int(prev.(Integer)))
@@ -227,7 +228,22 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 		}
 	}
 
-	// TODO: hybrid
+	// hybrid references mask current ones
+	hybrid, has_hybrid := trailer[Name("XRefStm")]
+	if has_hybrid {
+		hybrid_refs, hybrid_trailer, err := file.load_references(int(hybrid.(Integer)))
+		if err != nil {
+			return refs, trailer, err
+		}
+
+		for hybrid_ref := range hybrid_refs {
+			refs[hybrid_ref] = hybrid_refs[hybrid_ref]
+		}
+
+		for name := range hybrid_trailer {
+			trailer[name] = hybrid_trailer[name]
+		}
+	}
 
 	return refs, trailer, nil
 }
