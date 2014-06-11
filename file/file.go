@@ -18,6 +18,7 @@ type File struct {
 	filename string
 	file     *os.File
 	mmap     mmap.MMap
+	created  bool
 
 	// cross reference for existing objects
 	// indirect object for new objects
@@ -78,6 +79,7 @@ func Create(filename string) (*File, error) {
 		filename: filename,
 		Trailer:  Dictionary{},
 		objects:  map[uint]interface{}{},
+		created:  true,
 	}
 
 	// create enough of the pdf so that
@@ -95,6 +97,7 @@ func Create(filename string) (*File, error) {
 // Get returns the referenced object.
 // When the object does not exist, Null is returned.
 func (f *File) Get(reference ObjectReference) Object {
+	// fmt.Println("getting: ", reference)
 	object, ok := f.objects[reference.ObjectNumber]
 	if !ok {
 		return Null{}
@@ -111,13 +114,74 @@ func (f *File) Get(reference ObjectReference) Object {
 			if err != nil {
 				fmt.Println("file.Get:", err)
 			}
-			return obj.(IndirectObject).Object
+
+			iobj, ok := obj.(IndirectObject)
+			if !ok {
+				fmt.Println("indirect object is not ok")
+			}
+
+			if iobj.Object == nil {
+				fmt.Println("object is nil")
+			}
+			return iobj.Object
 		case 2: // in object stream
-			panic("object streams not yet supported")
+			// get the object stream
+			objectStream, ok := f.Get(ObjectReference{ObjectNumber: typed[1]}).(Stream)
+			if !ok {
+				return Null{}
+			}
+
+			// parse the index (object number and offset pairs)
+			index := []Integer{}
+			N := int(objectStream.Dictionary[Name("N")].(Integer))
+			stream, err := objectStream.Decode()
+			if err != nil {
+				panic(err)
+			}
+
+			offset := 0
+			for i := 0; i < N*2; i++ {
+				obj, n, err := parseNumeric(stream[offset:])
+				if err != nil {
+					panic(err)
+				}
+
+				index = append(index, obj.(Integer))
+				offset += n
+			}
+
+			// find the offset for the object we are looking for
+			start := typed[2] * 2
+			objectNumber := index[start]
+			offset = int(index[start+1])
+
+			// if the index from the cross reference is wrong,
+			// find the correct offset
+			if objectNumber != Integer(reference.ObjectNumber) {
+				objectNumber = Integer(reference.ObjectNumber)
+				for i := 0; i < len(index); i += 2 {
+					if index[i] == objectNumber {
+						offset = int(index[i+1])
+						break
+					}
+				}
+			}
+
+			// grab the object
+			first := int(objectStream.Dictionary[Name("First")].(Integer))
+			obj, _, err := parseObject(stream[first+offset:])
+			if err != nil {
+				panic(err)
+			}
+
+			return obj
 		default:
 			panic(typed[0])
 		}
 	case IndirectObject: // new object
+		if typed.Object == nil {
+			fmt.Println("+++++++++++++++++indirect object's object is nil")
+		}
 		return typed.Object
 	case freeObject: // newly freed object
 		return Null{}
@@ -143,6 +207,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 	case IndirectObject:
 		ref.ObjectNumber = typed.ObjectNumber
 		ref.GenerationNumber = typed.GenerationNumber
+		// fmt.Println("adding:", ref)
 
 		// check to see if the generation number works
 		existing, ok := f.objects[ref.ObjectNumber]
@@ -180,7 +245,19 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 
 		f.objects[ref.ObjectNumber] = typed
 	default:
-		panic(obj)
+		// TODO: reuse free object numbers
+		fmt.Println("add size", f.size)
+		objectNumber := f.size
+		f.size++
+
+		ref.ObjectNumber = objectNumber
+
+		f.objects[objectNumber] = IndirectObject{
+			ObjectReference: ref,
+			Object:          obj,
+		}
+
+		// panic(obj)
 	}
 	return ref, nil
 }
@@ -226,6 +303,7 @@ func (f *File) Save() error {
 		case crossReference:
 			// no-op, don't need to write unchanged objects to file
 			// however, we do need to handle the free list
+			// xrefs[Integer(i)] = typed
 			if typed[0] == 0 {
 				free = append(free, int(i))
 			}
@@ -295,10 +373,10 @@ func (f *File) Save() error {
 			switch xref[0] {
 			case 0:
 				// f entries
-				fmt.Fprintf(file, "f\n")
+				fmt.Fprintf(file, "f\r\n")
 			case 1:
 				// n entries
-				fmt.Fprintf(file, "n\n")
+				fmt.Fprintf(file, "n\r\n")
 			case 2:
 				panic("can't be in xref table")
 			default:
@@ -337,14 +415,19 @@ func (f *File) Save() error {
 
 // Close the File, does not Save.
 func (f *File) Close() error {
+	if f.created {
+		// don't need to clean up mmap
+		return nil
+	}
+
 	err := f.mmap.Unmap()
 	if err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 
 	err = f.file.Close()
 	if err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 
 	return nil
@@ -380,4 +463,58 @@ func (f *File) Free(objectNumber uint) {
 	default:
 		panic("unhandled type: " + reflect.TypeOf(typed).Name())
 	}
+}
+
+func (f *File) SaveAs(filename string) error {
+	saveas, err := Create(filename)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer saveas.Close()
+
+	// grab each object from f, add to save as (using same obj number)
+	for objectNumber := range f.objects {
+		// fmt.Println("copying:", objectNumber)
+		switch typed := f.objects[objectNumber].(type) {
+		case crossReference:
+			switch typed[0] {
+			case 0: // free
+				saveas.objects[objectNumber] = freeObject(typed[2])
+			case 1, 2: // normal and compressed
+				ref := ObjectReference{
+					ObjectNumber: objectNumber,
+				}
+				// first get the object, then add it
+				obj := f.Get(ref)
+				_, is_null := obj.(Null)
+				if is_null {
+					// skip free or missing objects
+					continue
+				}
+
+				saveas.Add(IndirectObject{ObjectReference: ref, Object: obj})
+			default:
+				panic(typed[0])
+			}
+		case IndirectObject:
+			// directly add indirect objects
+			saveas.Add(typed)
+		case freeObject:
+			saveas.objects[objectNumber] = typed
+		}
+	}
+
+	saveas.Root = f.Root
+
+	err = saveas.Save()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	err = saveas.Close()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	return nil
 }

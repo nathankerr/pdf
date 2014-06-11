@@ -68,26 +68,29 @@ func (file *File) loadReferences() error {
 
 	file.prev = Integer(xrefOffset)
 	file.objects = refs
+	file.size = uint(trailer[Name("Size")].(Integer))
+
+	fmt.Println("size:", file.size)
 
 	root := trailer[Name("Root")]
 	if root != nil {
 		file.Root = root.(ObjectReference)
 	}
 
-	encrypt := trailer[Name("Encrypt")]
-	if encrypt != nil {
-		file.Encrypt = encrypt.(Dictionary)
-	}
+	// encrypt := trailer[Name("Encrypt")]
+	// if encrypt != nil {
+	// 	file.Encrypt = encrypt.(Dictionary)
+	// }
 
-	info := trailer[Name("Info")]
-	if info != nil {
-		file.Info = info.(Dictionary)
-	}
+	// info := trailer[Name("Info")]
+	// if info != nil {
+	// 	file.Info = info.(Dictionary)
+	// }
 
-	id := trailer[Name("ID")]
-	if id != nil {
-		file.ID = id.(Array)
-	}
+	// id := trailer[Name("ID")]
+	// if id != nil {
+	// 	file.ID = id.(Array)
+	// }
 
 	// println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)
 	// println(string(file.mmap[xrefOffset : xrefOffset+200]))
@@ -162,6 +165,8 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 						xref[i] = uint(bytesToInt(stream[start : start+width]))
 						ioffset += width
 					}
+
+					refs[uint(objectNumber)] = xref
 
 					objectNumber++
 					offset += stride
