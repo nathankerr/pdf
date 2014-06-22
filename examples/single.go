@@ -24,13 +24,14 @@ func main() {
 	catalog := file.Get(file.Root).(pdf.Dictionary)
 	pages := getPages(file, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
 
-	single_page := pages[0].Object.(pdf.Dictionary)
-	delete(single_page, pdf.Name("Parent"))
-
-	// rebuild the pdf structure
+	// get a new root for the page tree
 	page_list := file.Get(catalog[pdf.Name("Pages")].(pdf.ObjectReference)).(pdf.Dictionary)
 	page_list[pdf.Name("Kids")] = pdf.Array{}
 	page_list_ref, err := file.Add(page_list)
+
+	// make the first page the only page
+	single_page := pages[0].Object.(pdf.Dictionary)
+	delete(single_page, pdf.Name("Parent"))
 
 	single_page[pdf.Name("Parent")] = page_list_ref
 	single_page_ref, err := file.Add(single_page)
@@ -39,16 +40,6 @@ func main() {
 	}
 	page_list[pdf.Name("Kids")] = append(page_list[pdf.Name("Kids")].(pdf.Array), single_page_ref)
 
-	// outlines
-	outlines := pdf.Dictionary{
-		pdf.Name("Type"):  pdf.Name("Outlines"),
-		pdf.Name("Count"): pdf.Integer(0),
-	}
-	outlines_ref, err := file.Add(outlines)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	// update page list count
 	page_list[pdf.Name("Count")] = pdf.Integer(len(page_list[pdf.Name("Kids")].(pdf.Array)))
 	file.Add(pdf.IndirectObject{
@@ -56,14 +47,16 @@ func main() {
 		Object:          page_list,
 	})
 
+	// update the catalog
 	catalog[pdf.Name("Pages")] = page_list_ref
-	catalog[pdf.Name("Outlines")] = outlines_ref
 	new_catalog_ref, err := file.Add(catalog)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	file.Root = new_catalog_ref
 
+	// save as because can't mix xref and xref stream files
+	// and xref stream writing is not supported (yet)
 	err = file.SaveAs("copy-" + filename)
 	if err != nil {
 		log.Fatalln(errgo.Details(err))
