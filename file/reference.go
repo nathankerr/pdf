@@ -70,8 +70,6 @@ func (file *File) loadReferences() error {
 	file.objects = refs
 	file.size = uint(trailer[Name("Size")].(Integer))
 
-	fmt.Println("size:", file.size)
-
 	root := trailer[Name("Root")]
 	if root != nil {
 		file.Root = root.(ObjectReference)

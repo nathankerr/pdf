@@ -246,7 +246,6 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 		f.objects[ref.ObjectNumber] = typed
 	default:
 		// TODO: reuse free object numbers
-		fmt.Println("add size", f.size)
 		objectNumber := f.size
 		f.size++
 

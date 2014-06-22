@@ -1,9 +1,5 @@
 package main
 
-// in pdf.change to single page view of all pages
-// - place all pages onto single page
-// - impose properly
-
 import (
 	"github.com/juju/errgo"
 	pdf "github.com/nathankerr/pdf/file"
@@ -28,14 +24,6 @@ func main() {
 	catalog := file.Get(file.Root).(pdf.Dictionary)
 	pages := getPages(file, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
 
-	// single_page := pdf.Dictionary{
-	// 	pdf.Name("Type"): pdf.Name("Page"),
-	// }
-
-	log.Println(pages[0])
-
-	log.Println("parent:", file.Get(pages[0].Object.(pdf.Dictionary)[pdf.Name("Parent")].(pdf.ObjectReference)))
-
 	single_page := pages[0].Object.(pdf.Dictionary)
 	delete(single_page, pdf.Name("Parent"))
 
@@ -50,8 +38,6 @@ func main() {
 		log.Fatalln(err)
 	}
 	page_list[pdf.Name("Kids")] = append(page_list[pdf.Name("Kids")].(pdf.Array), single_page_ref)
-
-	log.Println(single_page_ref)
 
 	// outlines
 	outlines := pdf.Dictionary{
@@ -70,21 +56,6 @@ func main() {
 		Object:          page_list,
 	})
 
-	// log.Println(file.Get(page_list[pdf.Name("Parent")].(pdf.ObjectReference)))
-
-	// try with a new catalog
-	// new_catalog := pdf.Dictionary{
-	// 	pdf.Name("Type"):     pdf.Name("Catalog"),
-	// 	pdf.Name("Pages"):    page_list_ref,
-	// 	pdf.Name("Outlines"): outlines_ref,
-	// }
-	// new_catalog_ref, err := file.Add(new_catalog)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	// file.Root = new_catalog_ref
-
-	// try with an updated old catalog
 	catalog[pdf.Name("Pages")] = page_list_ref
 	catalog[pdf.Name("Outlines")] = outlines_ref
 	new_catalog_ref, err := file.Add(catalog)
@@ -106,9 +77,7 @@ func main() {
 
 // transforms the page tree from the file into an array of pages
 func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.IndirectObject {
-	// log.Println("getPages:", ref)
 	pages := []pdf.IndirectObject{}
-
 	page_node := file.Get(ref).(pdf.Dictionary)
 
 	switch page_node[pdf.Name("Type")] {
@@ -116,8 +85,6 @@ func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.IndirectObject {
 		for _, kid_ref := range page_node[pdf.Name("Kids")].(pdf.Array) {
 			kid_pages := getPages(file, kid_ref.(pdf.ObjectReference))
 			pages = append(pages, kid_pages...)
-			// kid := file.Get(kid_ref.(pdf.ObjectReference)).(pdf.Dictionary)
-			// log.Println(kid)
 		}
 	case pdf.Name("Page"):
 		pages = append(pages, pdf.IndirectObject{

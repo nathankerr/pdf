@@ -6,6 +6,7 @@ all:
 	# go run examples/h7.go
 	cp paper.pdf paper-single.pdf
 	go run examples/single.go paper-single.pdf
+	open copy-paper-single.pdf
 
 test:
 	go test -i github.com/nathankerr/pdf/file
