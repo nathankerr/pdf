@@ -32,13 +32,19 @@ func main() {
 	// make the first page the only page
 	single_page := pages[0].Object.(pdf.Dictionary)
 	delete(single_page, pdf.Name("Parent"))
-
 	single_page[pdf.Name("Parent")] = page_list_ref
 	single_page_ref, err := file.Add(single_page)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	page_list[pdf.Name("Kids")] = append(page_list[pdf.Name("Kids")].(pdf.Array), single_page_ref)
+
+	// stack the contents of all the pages on the single_page
+	contents := pdf.Array{}
+	for _, page := range pages {
+		contents = append(contents, page.Object.(pdf.Dictionary)[pdf.Name("Contents")].(pdf.Array)...)
+	}
+	single_page[pdf.Name("Contents")] = contents
 
 	// update page list count
 	page_list[pdf.Name("Count")] = pdf.Integer(len(page_list[pdf.Name("Kids")].(pdf.Array)))
