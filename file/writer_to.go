@@ -108,6 +108,12 @@ func (d Dictionary) WriteTo(w io.Writer) (int64, error) {
 func (s Stream) WriteTo(w io.Writer) (int64, error) {
 	buf := &bytes.Buffer{}
 
+	// update the dictionary
+	if s.Dictionary == nil {
+		s.Dictionary = Dictionary{}
+	}
+	s.Dictionary[Name("Length")] = Integer(len(s.Stream))
+
 	s.Dictionary.WriteTo(buf)
 
 	fmt.Fprintf(buf, "\nstream\n")
