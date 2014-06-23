@@ -6,6 +6,7 @@ import (
 	"github.com/juju/errgo"
 	pdf "github.com/nathankerr/pdf/file"
 	"log"
+	"math"
 	"os"
 	"reflect"
 )
@@ -31,25 +32,69 @@ func main() {
 	catalog := single.Get(single.Root).(pdf.Dictionary)
 	pages := getPages(single, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
 
-	page_refs := []pdf.ObjectReference{}
+	// output to A4
+	paper_width := 595.224
+	paper_height := 841.824
+
+	// assume that all pages are the same size
+	media_box_obj := pages[0].Object.(pdf.Dictionary)[pdf.Name("MediaBox")]
+	var media_box pdf.Array
+	if media_box == nil {
+		// the first page inherits its MediaBox, therefore get it from the root
+		pages_ref := catalog[pdf.Name("Pages")].(pdf.ObjectReference)
+		pages := single.Get(pages_ref)
+		media_box = pages.(pdf.Dictionary)[pdf.Name("MediaBox")].(pdf.Array)
+	} else {
+		media_box = media_box_obj.(pdf.Array)
+	}
+	page_width := float64(media_box[2].(pdf.Real))
+	page_height := float64(media_box[3].(pdf.Real))
+	num_pages := len(pages)
+
+	// assuming that all the pages are the same size
+	// the sum of the page areas must fit in the paper area
+	// paper_area >= scale_factor² * num_pages * page_area
+	paper_area := paper_width * paper_height
+	page_area := page_width * page_height
+	scale_factor := math.Sqrt(paper_area / float64(num_pages) / page_area)
+	scaled_page_width := scale_factor * page_width
+	nx := int(math.Ceil(paper_width / scaled_page_width))
+	ny := num_pages / nx
+	for (nx * ny) < num_pages {
+		ny++
+	}
+
+	// adjust scale_factor to fit the new page count
+	scale_factor_width := paper_width / float64(nx) / page_width
+	scale_factor_height := paper_height / float64(ny) / page_height
+	if scale_factor_width > scale_factor_height {
+		scale_factor = scale_factor_height
+	} else {
+		scale_factor = scale_factor_width
+	}
+
 	xobjects := pdf.Dictionary{}
-	stream := bytes.Buffer{}
+	stream := &bytes.Buffer{}
+
+	// move to upper left
+	fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", 0, paper_height-(page_height*scale_factor))
+
+	// if the pages won't fill up the paper, center them on the paper
+	top_margin := (paper_height - (scale_factor * page_height * float64(ny))) / 2.0
+	left_margin := (paper_width - (scale_factor * page_width * float64(nx))) / 2.0
+	fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", left_margin, -top_margin)
+	// cairo_translate(cr, left_margin, top_margin);
+
+	// scale the pages
+	fmt.Fprintf(stream, "%v 0 0 %v 0 0 cm ", scale_factor, scale_factor)
+
 	for page_num, page := range pages {
 		page := page.Object.(pdf.Dictionary)
 
 		// change the dict. values
 		page[pdf.Name("Type")] = pdf.Name("XObject")
 		page[pdf.Name("Subtype")] = pdf.Name("Form")
-		if bbox, ok := page[pdf.Name("MediaBox")]; ok {
-			page[pdf.Name("BBox")] = bbox
-		} else {
-			page[pdf.Name("BBox")] = pdf.Array{
-				pdf.Integer(0),
-				pdf.Integer(0),
-				pdf.Real(419.53),
-				pdf.Real(595.224),
-			}
-		}
+		page[pdf.Name("BBox")] = media_box
 
 		// consolidate the contents
 		contents := []byte{}
@@ -64,7 +109,6 @@ func main() {
 			contents = append(contents, decoded...)
 		case pdf.Array:
 			for _, page_contents_ref := range typed {
-				log.Println(page_contents_ref)
 				page_contents_obj := single.Get(page_contents_ref.(pdf.ObjectReference))
 				decoded, err := page_contents_obj.(pdf.Stream).Decode()
 				if err != nil {
@@ -86,11 +130,24 @@ func main() {
 			log.Fatalln(errgo.Details(err))
 		}
 
-		page_refs = append(page_refs, xobj_ref)
-
+		// add to the single page
 		page_name := fmt.Sprintf("Page%d", page_num)
 		xobjects[pdf.Name(page_name)] = xobj_ref
-		stream.WriteString("/" + page_name + " Do")
+
+		// draw rectangle around the page
+		fmt.Fprintf(stream, "0 0 %v %v re S ", page_width, page_height)
+
+		// draw the page
+		stream.WriteString("/" + page_name + " Do ")
+
+		// move to where the next page goes
+		if (page_num+1)%nx == 0 {
+			fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", -page_width*float64(nx-1), -page_height)
+			// cairo_translate(cr, -page_width*(nx-1), page_height);
+		} else {
+			fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", page_width, 0)
+			// cairo_translate(cr, page_width, 0);
+		}
 	}
 
 	// Pages for single
@@ -125,8 +182,8 @@ func main() {
 		pdf.Name("MediaBox"): pdf.Array{
 			pdf.Integer(0),
 			pdf.Integer(0),
-			pdf.Real(595.224), // width
-			pdf.Real(841.824), // height
+			pdf.Real(paper_width),  // width
+			pdf.Real(paper_height), // height
 		},
 		pdf.Name("Contents"): contents_ref,
 	}
