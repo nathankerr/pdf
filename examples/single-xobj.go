@@ -39,7 +39,7 @@ func main() {
 	// assume that all pages are the same size
 	media_box_obj := pages[0].Object.(pdf.Dictionary)[pdf.Name("MediaBox")]
 	var media_box pdf.Array
-	if media_box == nil {
+	if media_box_obj == nil {
 		// the first page inherits its MediaBox, therefore get it from the root
 		pages_ref := catalog[pdf.Name("Pages")].(pdf.ObjectReference)
 		pages := single.Get(pages_ref)
