@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/juju/errgo"
 	pdf "github.com/nathankerr/pdf/file"
 	"log"
@@ -30,8 +32,9 @@ func main() {
 	pages := getPages(single, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
 
 	page_refs := []pdf.ObjectReference{}
+	xobjects := pdf.Dictionary{}
+	stream := bytes.Buffer{}
 	for page_num, page := range pages {
-		log.Println(page_num)
 		page := page.Object.(pdf.Dictionary)
 
 		// change the dict. values
@@ -74,6 +77,7 @@ func main() {
 			panic(reflect.TypeOf(typed).Name())
 		}
 
+		// add the xobject to the pdf
 		xobj_ref, err := single.Add(pdf.Stream{
 			Dictionary: page,
 			Stream:     contents,
@@ -81,7 +85,12 @@ func main() {
 		if err != nil {
 			log.Fatalln(errgo.Details(err))
 		}
+
 		page_refs = append(page_refs, xobj_ref)
+
+		page_name := fmt.Sprintf("Page%d", page_num)
+		xobjects[pdf.Name(page_name)] = xobj_ref
+		stream.WriteString("/" + page_name + " Do")
 	}
 
 	// Pages for single
@@ -95,7 +104,8 @@ func main() {
 
 	// content for single page
 	contents := pdf.Stream{
-		Stream: []byte("/Page0 Do"),
+		// Stream: []byte("/Page0 Do"),
+		Stream: stream.Bytes(),
 	}
 	contents_ref, err := single.Add(contents)
 	if err != nil {
@@ -107,9 +117,10 @@ func main() {
 		pdf.Name("Type"):   pdf.Name("Page"),
 		pdf.Name("Parent"): single_pages_ref,
 		pdf.Name("Resources"): pdf.Dictionary{
-			pdf.Name("XObject"): pdf.Dictionary{
-				pdf.Name("Page0"): page_refs[0],
-			},
+			pdf.Name("XObject"): xobjects,
+			// pdf.Name("XObject"): pdf.Dictionary{
+			// 	pdf.Name("Page0"): page_refs[0],
+			// },
 		},
 		pdf.Name("MediaBox"): pdf.Array{
 			pdf.Integer(0),
