@@ -80,6 +80,7 @@ func Create(filename string) (*File, error) {
 		Trailer:  Dictionary{},
 		objects:  map[uint]interface{}{},
 		created:  true,
+		size:     1,
 	}
 
 	// create enough of the pdf so that
