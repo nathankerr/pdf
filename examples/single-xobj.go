@@ -16,7 +16,7 @@ func main() {
 
 	// Process arguments
 	if len(os.Args) != 3 {
-		log.Fatalln("Usage: single-ref [input.pdf] [output.pdf]")
+		log.Fatalln("Usage: single-xobj [input.pdf] [output.pdf]")
 	}
 
 	input_filename := os.Args[1]
@@ -74,7 +74,7 @@ func main() {
 	}
 
 	xobjects := pdf.Dictionary{}
-	stream := &bytes.Buffer{}
+	stream := &bytes.Buffer{} // content stream for the single page
 
 	// move to upper left
 	fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", 0, paper_height-(page_height*scale_factor))
@@ -83,7 +83,6 @@ func main() {
 	top_margin := (paper_height - (scale_factor * page_height * float64(ny))) / 2.0
 	left_margin := (paper_width - (scale_factor * page_width * float64(nx))) / 2.0
 	fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", left_margin, -top_margin)
-	// cairo_translate(cr, left_margin, top_margin);
 
 	// scale the pages
 	fmt.Fprintf(stream, "%v 0 0 %v 0 0 cm ", scale_factor, scale_factor)
@@ -142,11 +141,11 @@ func main() {
 
 		// move to where the next page goes
 		if (page_num+1)%nx == 0 {
+			// move to first page of next line of pages
 			fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", -page_width*float64(nx-1), -page_height)
-			// cairo_translate(cr, -page_width*(nx-1), page_height);
 		} else {
+			// next page in same line
 			fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", page_width, 0)
-			// cairo_translate(cr, page_width, 0);
 		}
 	}
 
@@ -161,7 +160,6 @@ func main() {
 
 	// content for single page
 	contents := pdf.Stream{
-		// Stream: []byte("/Page0 Do"),
 		Stream: stream.Bytes(),
 	}
 	contents_ref, err := single.Add(contents)
@@ -175,9 +173,6 @@ func main() {
 		pdf.Name("Parent"): single_pages_ref,
 		pdf.Name("Resources"): pdf.Dictionary{
 			pdf.Name("XObject"): xobjects,
-			// pdf.Name("XObject"): pdf.Dictionary{
-			// 	pdf.Name("Page0"): page_refs[0],
-			// },
 		},
 		pdf.Name("MediaBox"): pdf.Array{
 			pdf.Integer(0),
