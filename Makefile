@@ -1,7 +1,7 @@
 all:
 	go fmt ./...
 	go install -v github.com/nathankerr/pdf
-	go run examples/single-xobj.go paper.pdf paper-single.pdf
+	go run examples/chapbook.go paper.pdf paper-single.pdf
 	open paper-single.pdf
 
 test:
