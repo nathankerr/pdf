@@ -351,12 +351,7 @@ func (f *File) Save() error {
 		}
 
 		if objects[i] != objects[i-1]+1 {
-			if groupStart+i-1 == groupStart {
-				// handle single length groups
-				groups = append(groups, objects[groupStart:groupStart+1])
-			} else {
-				groups = append(groups, objects[groupStart:groupStart+i-1])
-			}
+			groups = append(groups, objects[groupStart:i-1])
 			groupStart = i
 		}
 	}
