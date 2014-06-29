@@ -47,8 +47,27 @@ func main() {
 	} else {
 		media_box = media_box_obj.(pdf.Array)
 	}
-	page_width := float64(media_box[2].(pdf.Real))
-	page_height := float64(media_box[3].(pdf.Real))
+
+	var page_width float64
+	switch typed := media_box[2].(type) {
+	case pdf.Real:
+		page_width = float64(typed)
+	case pdf.Integer:
+		page_width = float64(typed)
+	default:
+		panic(reflect.TypeOf(typed).Name())
+	}
+
+	var page_height float64
+	switch typed := media_box[3].(type) {
+	case pdf.Real:
+		page_height = float64(typed)
+	case pdf.Integer:
+		page_height = float64(typed)
+	default:
+		panic(reflect.TypeOf(typed).Name())
+	}
+
 	num_pages := len(pages)
 
 	// assuming that all the pages are the same size
@@ -100,21 +119,25 @@ func main() {
 		switch typed := page[pdf.Name("Contents")].(type) {
 		case pdf.ObjectReference:
 			page_contents_obj := single.Get(typed)
-			decoded, err := page_contents_obj.(pdf.Stream).Decode()
-			if err != nil {
-				log.Fatalln(errgo.Details(err))
-			}
-
-			contents = append(contents, decoded...)
+			page_contents := page_contents_obj.(pdf.Stream)
+			contents = page_contents.Stream
+			page[pdf.Name("Filter")] = page_contents.Dictionary[pdf.Name("Filter")]
 		case pdf.Array:
-			for _, page_contents_ref := range typed {
-				page_contents_obj := single.Get(page_contents_ref.(pdf.ObjectReference))
-				decoded, err := page_contents_obj.(pdf.Stream).Decode()
-				if err != nil {
-					log.Fatalln(errgo.Details(err))
-				}
+			if len(typed) == 1 {
+				page_contents_obj := single.Get(typed[0].(pdf.ObjectReference))
+				page_contents := page_contents_obj.(pdf.Stream)
+				contents = page_contents.Stream
+				page[pdf.Name("Filter")] = page_contents.Dictionary[pdf.Name("Filter")]
+			} else {
+				for _, page_contents_ref := range typed {
+					page_contents_obj := single.Get(page_contents_ref.(pdf.ObjectReference))
+					decoded, err := page_contents_obj.(pdf.Stream).Decode()
+					if err != nil {
+						log.Fatalln(errgo.Details(err))
+					}
 
-				contents = append(contents, decoded...)
+					contents = append(contents, decoded...)
+				}
 			}
 		default:
 			panic(reflect.TypeOf(typed).Name())
