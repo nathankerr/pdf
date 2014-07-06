@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/juju/errgo"
-	pdf "github.com/nathankerr/pdf/file"
+	"github.com/nathankerr/pdf"
 	"log"
 )
 
