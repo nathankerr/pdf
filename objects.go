@@ -1,4 +1,4 @@
-package file
+package pdf
 
 import (
 	"io"

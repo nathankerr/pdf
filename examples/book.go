@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/juju/errgo"
-	pdf "github.com/nathankerr/pdf/file"
+	"github.com/nathankerr/pdf"
 	"log"
 	"math"
 	"os"
@@ -31,7 +31,6 @@ func main() {
 
 	// get the pdf page references
 	catalog := chapbook.Get(chapbook.Root).(pdf.Dictionary)
-	log.Println("old pages:", chapbook.Get(catalog[pdf.Name("Pages")].(pdf.ObjectReference)))
 	pages := getPages(chapbook, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
 
 	// assuming that all pages are the same size, figure out the

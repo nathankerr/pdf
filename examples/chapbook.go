@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/juju/errgo"
-	pdf "github.com/nathankerr/pdf/file"
+	"github.com/nathankerr/pdf"
 	"io/ioutil"
 	"log"
 	"math"
