@@ -488,11 +488,12 @@ func (f *File) SaveAs(filename string) error {
 				}
 
 				// skip object streams
-				if stream, ok := obj.(Stream); ok {
-					if stream.Dictionary[Name("Type")] == Name("ObjStm") {
-						continue
-					}
-				}
+				// skip skipping object streams as some objects get lost
+				// if stream, ok := obj.(Stream); ok {
+				// 	if stream.Dictionary[Name("Type")] == Name("ObjStm") {
+				// 		continue
+				// 	}
+				// }
 
 				saveas.Add(IndirectObject{ObjectReference: ref, Object: obj})
 			default:
