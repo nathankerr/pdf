@@ -70,25 +70,22 @@ func (file *File) loadReferences() error {
 	file.objects = refs
 	file.size = uint(trailer[Name("Size")].(Integer))
 
-	root := trailer[Name("Root")]
-	if root != nil {
+	// fill in values from the trailer
+	if root, ok := trailer[Name("Root")]; ok {
 		file.Root = root.(ObjectReference)
 	}
 
-	// encrypt := trailer[Name("Encrypt")]
-	// if encrypt != nil {
-	// 	file.Encrypt = encrypt.(Dictionary)
-	// }
+	if encrypt, ok := trailer[Name("Encrypt")]; ok {
+		file.Encrypt = encrypt.(Dictionary)
+	}
 
-	// info := trailer[Name("Info")]
-	// if info != nil {
-	// 	file.Info = info.(Dictionary)
-	// }
+	if info, ok := trailer[Name("Info")]; ok {
+		file.Info = info.(ObjectReference)
+	}
 
-	// id := trailer[Name("ID")]
-	// if id != nil {
-	// 	file.ID = id.(Array)
-	// }
+	if id, ok := trailer[Name("ID")]; ok {
+		file.ID = id.(Array)
+	}
 
 	// println(string(file.mmap[xrefStart:xrefEnd]), xrefOffset)
 	// println(string(file.mmap[xrefOffset : xrefOffset+200]))

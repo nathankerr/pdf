@@ -1,5 +1,9 @@
 package pdf
 
+// NOTE for encryption:
+// encrypt during Add
+// decrypt during Get
+
 import (
 	"bytes"
 	"fmt"
@@ -14,6 +18,7 @@ import (
 type freeObject uint // generation number for next use of the object number where this is stored
 
 // File manages access to objects stored in a PDF file.
+// Contains the non-managed keys from the file trailer.
 type File struct {
 	filename string
 	file     *os.File
@@ -29,14 +34,19 @@ type File struct {
 	nextFree uint // object number of next free object
 	size     uint // max object number + 1
 
-	prev    Integer
-	Trailer Dictionary
+	prev Integer
 
-	// things from trailer that should be exported
-	Root    ObjectReference
+	// The catalog dictionary for the PDF document contained in the file.
+	Root ObjectReference
+
+	// The Document's encryption dictionary
 	Encrypt Dictionary
-	Info    Dictionary
-	ID      Array
+
+	// The document's information dictionary
+	Info ObjectReference
+
+	// An array of two byte-strings constituting a file identifier for the file.
+	ID Array
 }
 
 // Open opens a PDF file for manipulation of its objects.
@@ -77,7 +87,6 @@ func Open(filename string) (*File, error) {
 func Create(filename string) (*File, error) {
 	file := &File{
 		filename: filename,
-		Trailer:  Dictionary{},
 		objects:  map[uint]interface{}{},
 		created:  true,
 		size:     1,
@@ -380,11 +389,11 @@ func (f *File) Save() error {
 		}
 	}
 
-	// Write the file trailer
+	// Setup create the trailer
 	fmt.Fprintf(file, "\ntrailer\n")
 	trailer := Dictionary{}
-	trailer[Name("Root")] = f.Root
 
+	// Size
 	// Figure out the highest object number to set Size properly
 	var maxObjNum uint
 	for objNum := range f.objects {
@@ -394,8 +403,27 @@ func (f *File) Save() error {
 	}
 	trailer[Name("Size")] = Integer(maxObjNum + 1)
 
+	// Prev
 	if f.prev != 0 {
 		trailer[Name("Prev")] = f.prev
+	}
+
+	// Root
+	trailer[Name("Root")] = f.Root
+
+	// Encrypt
+	if len(f.Encrypt) != 0 {
+		trailer[Name("Encrypt")] = f.Encrypt
+	}
+
+	// Info
+	if f.Info.ObjectNumber != 0 {
+		trailer[Name("Info")] = f.Info
+	}
+
+	// ID
+	if len(f.ID) != 0 {
+		trailer[Name("ID")] = f.ID
 	}
 
 	_, err = trailer.WriteTo(file)
