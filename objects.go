@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -75,7 +76,8 @@ func (Stream) thisIsABasicPDFObject() {}
 
 // The Null object has a type and value that are unequal to any other object.
 // - §7.3.9
-type Null struct{}
+// The embedded error is used to tell why the Null exists (e.g., why it was returned from file.Get()
+type Null struct{ Error error }
 
 func (Null) thisIsABasicPDFObject() {}
 
@@ -88,6 +90,10 @@ type ObjectReference struct {
 }
 
 func (ObjectReference) thisIsABasicPDFObject() {}
+
+func (ref ObjectReference) String() string {
+	return fmt.Sprintf("%v %v R", ref.ObjectNumber, ref.GenerationNumber)
+}
 
 // An IndirectObject gives an Object an ObjectReference by which
 // other Objects can refer to it.

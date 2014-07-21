@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
-	"github.com/juju/errgo"
 	"io"
 	"os"
 	"reflect"
@@ -59,25 +58,25 @@ func Open(filename string) (*File, error) {
 	var err error
 	file.file, err = os.Open(filename)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, maskErr(err)
 	}
 
 	file.mmap, err = mmap.Map(file.file, mmap.RDONLY, 0)
 	if err != nil {
 		file.Close()
-		return nil, errgo.Mask(err)
+		return nil, maskErr(err)
 	}
 
 	// check pdf file header
 	if !bytes.Equal(file.mmap[:7], []byte("%PDF-1.")) {
 		file.Close()
-		return nil, errgo.New("file does not have PDF header")
+		return nil, newErr("file does not have PDF header")
 	}
 
 	err = file.loadReferences()
 	if err != nil {
 		file.Close()
-		return nil, errgo.Mask(err)
+		return nil, maskErr(err)
 	}
 
 	return file, nil
@@ -96,7 +95,7 @@ func Create(filename string) (*File, error) {
 	// appends will not break things
 	f, err := os.Create(filename)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, maskErr(err)
 	}
 	defer f.Close()
 	f.Write([]byte("%PDF-1.7"))
@@ -110,7 +109,7 @@ func (f *File) Get(reference ObjectReference) Object {
 	// fmt.Println("getting: ", reference)
 	object, ok := f.objects[reference.ObjectNumber]
 	if !ok {
-		return Null{}
+		return Null{newErrf("%s not found", reference)}
 	}
 
 	switch typed := object.(type) {
@@ -122,23 +121,24 @@ func (f *File) Get(reference ObjectReference) Object {
 			offset := typed[1] - 1
 			obj, _, err := parseIndirectObject(f.mmap[offset:])
 			if err != nil {
-				fmt.Println("file.Get:", err)
+				return Null{pushErrf(err, "Error parsing %s", reference)}
 			}
 
 			iobj, ok := obj.(IndirectObject)
 			if !ok {
-				fmt.Println("indirect object is not ok")
+				return Null{newErrf("%v is not an indirect object", reference)}
 			}
 
 			if iobj.Object == nil {
-				fmt.Println("object is nil")
+				return Null{newErrf("%v's object is nil", reference)}
 			}
 			return iobj.Object
 		case 2: // in object stream
 			// get the object stream
-			objectStream, ok := f.Get(ObjectReference{ObjectNumber: typed[1]}).(Stream)
+			objectStreamRef := ObjectReference{ObjectNumber: typed[1]}
+			objectStream, ok := f.Get(objectStreamRef).(Stream)
 			if !ok {
-				return Null{}
+				return Null{newErrf("%v should be in object stream %v, but %v is not a stream", reference, objectStreamRef, objectStreamRef)}
 			}
 
 			// parse the index (object number and offset pairs)
@@ -146,14 +146,14 @@ func (f *File) Get(reference ObjectReference) Object {
 			N := int(objectStream.Dictionary[Name("N")].(Integer))
 			stream, err := objectStream.Decode()
 			if err != nil {
-				panic(err)
+				return Null{pushErrf(err, "could not decode %v", objectStreamRef)}
 			}
 
 			offset := 0
 			for i := 0; i < N*2; i++ {
 				obj, n, err := parseNumeric(stream[offset:])
 				if err != nil {
-					panic(err)
+					return Null{pushErrf(err, "unable to parse numeric %v", stream[offset:])}
 				}
 
 				index = append(index, obj.(Integer))
@@ -181,7 +181,7 @@ func (f *File) Get(reference ObjectReference) Object {
 			first := int(objectStream.Dictionary[Name("First")].(Integer))
 			obj, _, err := parseObject(stream[first+offset:])
 			if err != nil {
-				panic(err)
+				return Null{pushErrf(err, "unable to parse object %v", stream[first+offset:])}
 			}
 
 			return obj
@@ -194,7 +194,7 @@ func (f *File) Get(reference ObjectReference) Object {
 		}
 		return typed.Object
 	case freeObject: // newly freed object
-		return Null{}
+		return Null{newErrf("%v freed after pdf was loaded", reference)}
 	default:
 		panic("unhandled type: " + reflect.TypeOf(object).Name())
 	}
@@ -249,7 +249,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 			if ref.GenerationNumber < minGenerationNumber {
 				// TODO: make better error
 				ref.GenerationNumber = minGenerationNumber
-				return ref, errgo.New("Generation number is too small...")
+				return ref, newErr("Generation number is too small...")
 			}
 		}
 
@@ -273,7 +273,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 
 func writeLineBreakTo(w io.Writer) (int64, error) {
 	n, err := w.Write([]byte{'\n', '\n'})
-	return int64(n), errgo.Mask(err)
+	return int64(n), maskErr(err)
 }
 
 // Save appends the objects that have been added to the File
@@ -285,12 +285,12 @@ func writeLineBreakTo(w io.Writer) (int64, error) {
 func (f *File) Save() error {
 	info, err := os.Stat(f.filename)
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	file, err := os.OpenFile(f.filename, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 	defer file.Close()
 
@@ -298,7 +298,7 @@ func (f *File) Save() error {
 
 	n, err := writeLineBreakTo(file)
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 	offset += n
 
@@ -320,13 +320,13 @@ func (f *File) Save() error {
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
 			n, err = typed.WriteTo(file)
 			if err != nil {
-				return errgo.Mask(err)
+				return maskErr(err)
 			}
 			offset += n
 
 			n, err = writeLineBreakTo(file)
 			if err != nil {
-				return errgo.Mask(err)
+				return maskErr(err)
 			}
 			offset += n
 		case freeObject:
@@ -428,7 +428,7 @@ func (f *File) Save() error {
 
 	_, err = trailer.WriteTo(file)
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	fmt.Fprintf(file, "\nstartxref\n%d\n%%%%EOF", offset-1)
@@ -445,12 +445,12 @@ func (f *File) Close() error {
 
 	err := f.mmap.Unmap()
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	err = f.file.Close()
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	return nil
@@ -491,7 +491,7 @@ func (f *File) Free(objectNumber uint) {
 func (f *File) SaveAs(filename string) error {
 	saveas, err := Create(filename)
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 	defer saveas.Close()
 
@@ -509,9 +509,9 @@ func (f *File) SaveAs(filename string) error {
 				}
 				// first get the object, then add it
 				obj := f.Get(ref)
-				_, is_null := obj.(Null)
-				if is_null {
+				if _, is_null := obj.(Null); is_null {
 					// skip free or missing objects
+					// return pushErrf(null_obj.Error, "%v is null", ref)
 					continue
 				}
 
@@ -539,12 +539,12 @@ func (f *File) SaveAs(filename string) error {
 
 	err = saveas.Save()
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	err = saveas.Close()
 	if err != nil {
-		return errgo.Mask(err)
+		return maskErr(err)
 	}
 
 	return nil
