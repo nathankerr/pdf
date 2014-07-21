@@ -77,7 +77,7 @@ func Open(filename string) (*File, error) {
 	err = file.loadReferences()
 	if err != nil {
 		file.Close()
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 
 	return file, nil
@@ -273,7 +273,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 
 func writeLineBreakTo(w io.Writer) (int64, error) {
 	n, err := w.Write([]byte{'\n', '\n'})
-	return int64(n), err
+	return int64(n), errgo.Mask(err)
 }
 
 // Save appends the objects that have been added to the File
