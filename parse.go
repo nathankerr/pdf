@@ -96,17 +96,25 @@ func parseObject(slice []byte) (Object, int, error) {
 				return object, start + n, errors.New("expected a Dictionary")
 			}
 
-			streamLength := int(dict["Length"].(Integer))
-			object = Stream{
-				Dictionary: dict,
-				Stream:     slice[start+n : start+n+streamLength],
-			}
-			n += streamLength
-
-			n2, ok = match(slice[start+n:], "endstream")
-			n += n2
+			streamLengthInteger, ok := dict["Length"].(Integer)
 			if !ok {
-				return object, start + n, errors.New("expected 'endstream'")
+				object = Stream{
+					Dictionary: dict,
+					Stream: slice[start+n:],
+				}
+			} else {
+				streamLength := int(streamLengthInteger)
+				object = Stream{
+					Dictionary: dict,
+					Stream:     slice[start+n : start+n+streamLength],
+				}
+				n += streamLength
+
+				n2, ok = match(slice[start+n:], "endstream")
+				n += n2
+				if !ok {
+					return object, start + n, errors.New("expected 'endstream'")
+				}
 			}
 		}
 	}
@@ -494,7 +502,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	objectNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, err
+		return io, i, maskErr(err)
 	}
 	io.ObjectNumber = uint(objectNumber)
 
@@ -503,7 +511,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	generationNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, err
+		return io, i, maskErr(err)
 	}
 	io.GenerationNumber = uint(generationNumber)
 
@@ -511,7 +519,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	n, ok := match(slice[i:], "obj")
 	i += n
 	if !ok {
-		return io, i, errors.New("could not find 'obj'")
+		return io, i, newErr("could not find 'obj'")
 	}
 
 	// the object
@@ -519,14 +527,21 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	i += n
 	io.Object = object
 	if err != nil {
-		return io, i, err
+		return io, i, maskErr(err)
+	}
+
+	// stream objects might not have determinable lengths, and so cannot be fully parsed
+	if stream, is_stream := object.(Stream); is_stream {
+		if _, isObjectRef := stream.Dictionary["Length"].(ObjectReference); isObjectRef {
+			return io, i, nil
+		}
 	}
 
 	// "endobj"
 	n, ok = match(slice[i:], "endobj")
 	i += n
 	if !ok {
-		return io, i, errors.New("could not find 'endobj'")
+		return io, i, newErr("could not find 'endobj'")
 	}
 
 	return io, i, nil

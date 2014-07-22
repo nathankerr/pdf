@@ -107,12 +107,14 @@ func Create(filename string) (*File, error) {
 // When the object does not exist, Null is returned.
 func (f *File) Get(reference ObjectReference) Object {
 	// fmt.Println("getting: ", reference)
-	object, ok := f.objects[reference.ObjectNumber]
+	objectRaw, ok := f.objects[reference.ObjectNumber]
 	if !ok {
 		return Null{newErrf("%s not found", reference)}
 	}
 
-	switch typed := object.(type) {
+	var object Object
+
+	switch typed := objectRaw.(type) {
 	case crossReference: // existing object
 		switch typed[0] {
 		case 0: // free entry
@@ -132,7 +134,7 @@ func (f *File) Get(reference ObjectReference) Object {
 			if iobj.Object == nil {
 				return Null{newErrf("%v's object is nil", reference)}
 			}
-			return iobj.Object
+			object = iobj.Object
 		case 2: // in object stream
 			// get the object stream
 			objectStreamRef := ObjectReference{ObjectNumber: typed[1]}
@@ -179,12 +181,10 @@ func (f *File) Get(reference ObjectReference) Object {
 
 			// grab the object
 			first := int(objectStream.Dictionary[Name("First")].(Integer))
-			obj, _, err := parseObject(stream[first+offset:])
+			object, _, err = parseObject(stream[first+offset:])
 			if err != nil {
 				return Null{pushErrf(err, "unable to parse object %v", stream[first+offset:])}
 			}
-
-			return obj
 		default:
 			panic(typed[0])
 		}
@@ -192,12 +192,24 @@ func (f *File) Get(reference ObjectReference) Object {
 		if typed.Object == nil {
 			fmt.Println("+++++++++++++++++indirect object's object is nil")
 		}
-		return typed.Object
+		object = typed.Object
 	case freeObject: // newly freed object
 		return Null{newErrf("%v freed after pdf was loaded", reference)}
 	default:
 		panic("unhandled type: " + reflect.TypeOf(object).Name())
 	}
+
+	// deal with streams that have references to lengths
+	if streamObj, ok := object.(Stream); ok {
+		if lengthRef, ok := streamObj.Dictionary["Length"].(ObjectReference); ok {
+			length := f.Get(lengthRef).(Integer)
+			streamObj.Dictionary["Length"] = length
+			streamObj.Stream = streamObj.Stream[:int(length)]
+		}
+		object = streamObj
+	}
+
+	return object
 }
 
 // Add returns the object reference of the object after adding it to the file.
@@ -360,7 +372,7 @@ func (f *File) Save() error {
 		}
 
 		if objects[i] != objects[i-1]+1 {
-			groups = append(groups, objects[groupStart:i-1])
+			groups = append(groups, objects[groupStart:i])
 			groupStart = i
 		}
 	}
@@ -509,9 +521,9 @@ func (f *File) SaveAs(filename string) error {
 				}
 				// first get the object, then add it
 				obj := f.Get(ref)
-				if _, is_null := obj.(Null); is_null {
+				if null_obj, is_null := obj.(Null); is_null {
 					// skip free or missing objects
-					// return pushErrf(null_obj.Error, "%v is null", ref)
+					return pushErrf(null_obj.Error, "%v is null", ref)
 					continue
 				}
 
