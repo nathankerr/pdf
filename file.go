@@ -118,7 +118,7 @@ func (f *File) Get(reference ObjectReference) Object {
 	case crossReference: // existing object
 		switch typed[0] {
 		case 0: // free entry
-			return Null{}
+			return Null{newErrf("%s is a free object", reference)}
 		case 1: // normal
 			offset := typed[1] - 1
 			obj, _, err := parseIndirectObject(f.mmap[offset:])
@@ -295,12 +295,17 @@ func writeLineBreakTo(w io.Writer) (int64, error) {
 // NOTE: A new object index will be written on each save,
 // taking space in the file on disk
 func (f *File) Save() error {
+	// return f.saveUsingXrefTable()
+	return f.saveUsingXrefStream()
+}
+
+func (f *File) saveUsingXrefTable() error {
 	info, err := os.Stat(f.filename)
 	if err != nil {
 		return maskErr(err)
 	}
 
-	file, err := os.OpenFile(f.filename, os.O_RDWR|os.O_APPEND, 0666)
+	file, err := os.OpenFile(f.filename, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return maskErr(err)
 	}
@@ -439,6 +444,194 @@ func (f *File) Save() error {
 	}
 
 	_, err = trailer.WriteTo(file)
+	if err != nil {
+		return maskErr(err)
+	}
+
+	fmt.Fprintf(file, "\nstartxref\n%d\n%%%%EOF", offset-1)
+
+	return nil
+}
+
+func (f *File) saveUsingXrefStream() error {
+	info, err := os.Stat(f.filename)
+	if err != nil {
+		return maskErr(err)
+	}
+
+	file, err := os.OpenFile(f.filename, os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		return maskErr(err)
+	}
+	defer file.Close()
+
+	offset := info.Size() + 1
+
+	n, err := writeLineBreakTo(file)
+	if err != nil {
+		return maskErr(err)
+	}
+	offset += n
+
+	xrefs := map[Integer]crossReference{}
+
+	xrefs[0] = crossReference{0, 0, 65535}
+
+	free := sort.IntSlice{0}
+	for i := range f.objects {
+		switch typed := f.objects[i].(type) {
+		case crossReference:
+			// no-op, don't need to write unchanged objects to file
+			// however, we do need to handle the free list
+			// xrefs[Integer(i)] = typed
+			if typed[0] == 0 {
+				free = append(free, int(i))
+			}
+		case IndirectObject:
+			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
+			n, err = typed.WriteTo(file)
+			if err != nil {
+				return maskErr(err)
+			}
+			offset += n
+
+			n, err = writeLineBreakTo(file)
+			if err != nil {
+				return maskErr(err)
+			}
+			offset += n
+		case freeObject:
+			xrefs[Integer(i)] = crossReference{0, 0, uint(typed)}
+			free = append(free, int(i))
+		default:
+			panic("unhandled type: " + reflect.TypeOf(typed).Name())
+		}
+	}
+
+	// Figure out the highest object number to set Size properly
+	var maxObjNum uint
+	for objNum := range f.objects {
+		if objNum > maxObjNum {
+			maxObjNum = objNum
+		}
+	}
+
+	// add an xref for the xrefstream
+	xrefstreamObjectNumber := uint(maxObjNum + 1)
+	maxObjNum++
+	xref := crossReference{1, uint(offset - 1), 0}
+	xrefs[Integer(xrefstreamObjectNumber)] = xref
+	f.objects[xrefstreamObjectNumber] = xref
+
+	// fill in the free linked list
+	free.Sort()
+	for i := 0; i < free.Len()-1; i++ {
+		xref := xrefs[Integer(free[i])]
+		xref[1] = uint(free[i+1])
+		xrefs[Integer(free[i])] = xref
+	}
+
+	objects := make(sort.IntSlice, 0, len(xrefs))
+	for objectNumber := range xrefs {
+		objects = append(objects, int(objectNumber))
+	}
+	objects.Sort()
+
+	// group into consecutive sets
+	groups := []sort.IntSlice{}
+	groupStart := 0
+	for i := range objects {
+		if i == 0 {
+			continue
+		}
+
+		if objects[i] != objects[i-1]+1 {
+			groups = append(groups, objects[groupStart:i])
+			groupStart = i
+		}
+	}
+	groups = append(groups, objects[groupStart:])
+
+	// Create the xrefstream dictionary (the trailer)
+	trailer := Dictionary{}
+	trailer[Name("Size")] = Integer(maxObjNum + 1)
+
+	// Prev
+	if f.prev != 0 {
+		trailer[Name("Prev")] = f.prev
+	}
+
+	// Root
+	trailer[Name("Root")] = f.Root
+
+	// Encrypt
+	if len(f.Encrypt) != 0 {
+		trailer[Name("Encrypt")] = f.Encrypt
+	}
+
+	// Info
+	if f.Info.ObjectNumber != 0 {
+		trailer[Name("Info")] = f.Info
+	}
+
+	// ID
+	if len(f.ID) != 0 {
+		trailer[Name("ID")] = f.ID
+	}
+
+	// Add xrefstream specific things to trailer
+	trailer["Type"] = Name("XRef")
+
+	// Index
+	index := Array{}
+	// fmt.Println(groups)
+	for _, group := range groups {
+		index = append(index, Integer(group[0]), Integer(len(group)))
+	}
+	trailer["Index"] = index
+
+	// layout for the stream (W)
+	maxXref := [3]uint{}
+	for _, xref := range xrefs {
+		for i := 0; i < len(xref); i++ {
+			if xref[i] > maxXref[i] {
+				maxXref[i] = xref[i]
+			}
+		}
+	}
+	nBytes := [3]int{}
+	for i := range nBytes {
+		nBytes[i] = nBytesForInt(int(maxXref[i]))
+	}
+	trailer["W"] = Array{Integer(nBytes[0]), Integer(nBytes[1]), Integer(nBytes[2])}
+
+	// log.Println(xrefs)
+
+	stream := &bytes.Buffer{}
+	for _, group := range groups {
+		for _, objectNumber := range group {
+			xref := xrefs[Integer(objectNumber)]
+			for i := range xref {
+				stream.Write(intToBytes(xref[i], nBytes[i]))
+			}
+		}
+	}
+
+	xrefstream := IndirectObject{
+		ObjectReference: ObjectReference{
+			ObjectNumber: xrefstreamObjectNumber,
+		},
+		Object: Stream{
+			Dictionary: trailer,
+			Stream:     stream.Bytes(),
+		},
+	}
+	_, err = f.Add(xrefstream)
+	if err != nil {
+		return maskErr(err)
+	}
+
+	_, err = xrefstream.WriteTo(file)
 	if err != nil {
 		return maskErr(err)
 	}

@@ -27,7 +27,7 @@ func createMinimalFile() {
 	}
 	defer minimal.Close()
 
-	minimal.Trailer[pdf.Name("Root")] = pdf.ObjectReference{ObjectNumber: 1}
+	minimal.Root = pdf.ObjectReference{ObjectNumber: 1}
 
 	// catalog
 	minimal.Add(pdf.IndirectObject{

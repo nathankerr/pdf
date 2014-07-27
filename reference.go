@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -147,25 +148,18 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 			}
 		}
 
+		offset := 0
 		for _, index := range indexes {
 			objectNumber := index.objectNumber
-			offset := 0
 			for n := 0; n < index.size; n++ {
-				for offset < len(stream) {
-					xref := crossReference{}
-					ioffset := 0
-					for i := 0; i < 2; i++ {
-						width := wi[i]
-						start := offset + ioffset
-						xref[i] = uint(bytesToInt(stream[start : start+width]))
-						ioffset += width
-					}
-
-					refs[uint(objectNumber)] = xref
-
-					objectNumber++
-					offset += stride
+				xref := crossReference{}
+				for i := 0; i < len(wi); i++ {
+					width := wi[i]
+					xref[i] = uint(bytesToInt(stream[offset : offset+width]))
+					offset += width
 				}
+				refs[uint(objectNumber)] = xref
+				objectNumber++
 			}
 		}
 
@@ -249,12 +243,37 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 }
 
 func bytesToInt(bytesOfInt []byte) int {
-	value := 0
-	for i, b := range bytesOfInt {
-		shift := len(bytesOfInt) - i - 1
-		value += int(b) << uint(8*shift)
+	// pad bytesOfInt so that it fits an uint64
+	const sizeOfUint64 = 8
+	diff := sizeOfUint64 - len(bytesOfInt)
+	paddedBytes := make([]byte, diff, sizeOfUint64)
+	paddedBytes = append(paddedBytes, bytesOfInt...)
+
+	b := bytes.NewReader(paddedBytes)
+	var value uint64
+	err := binary.Read(b, binary.BigEndian, &value)
+	if err != nil {
+		panic(err)
 	}
-	return value
+	return int(value)
+}
+
+// Number of bytes required to encode value
+func nBytesForInt(value int) int {
+	i := 1
+	for value > (1 << uint(8*i)) {
+		i++
+	}
+	return i
+}
+
+func intToBytes(value uint, size int) []byte {
+	b := &bytes.Buffer{}
+	v := uint64(value)
+	binary.Write(b, binary.BigEndian, v)
+
+	bytesOfInt := b.Bytes()
+	return bytesOfInt[len(bytesOfInt)-size:]
 }
 
 func parseXrefBlock(slice []byte) (crossReferences, int) {

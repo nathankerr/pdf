@@ -33,6 +33,10 @@ func (err Error) Error() string {
 	return buf.String()
 }
 
+func (err Error) String() string {
+	return err.Error()
+}
+
 func (err *Error) setLocation() {
 	if _, file, line, ok := runtime.Caller(2); ok {
 		err.hasLocation = true

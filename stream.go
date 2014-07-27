@@ -16,6 +16,11 @@ import (
 
 // Decode decodes the stream data using the filters in the stream's dictionary.
 func (s Stream) Decode() ([]byte, error) {
+	// when there are no filters, it is already decoded
+	if _, ok := s.Dictionary["Filter"]; !ok {
+		return s.Stream, nil
+	}
+
 	// extract the list of filters to use
 	filters := []Name{}
 	switch streamFilter := s.Dictionary[Name("Filter")].(type) {
