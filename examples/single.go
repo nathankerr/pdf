@@ -15,18 +15,18 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 
 	// Process arguments
-	if len(os.Args) != 3 {
-		log.Fatalln("Usage: single-xobj [input.pdf] [output.pdf]")
+	if len(os.Args) != 2 {
+		log.Fatalln("Usage: single [file.pdf]")
 	}
 
-	input_filename := os.Args[1]
-	output_filename := os.Args[2]
+	filename := os.Args[1]
 
 	// open pdf document
-	single, err := pdf.Open(input_filename)
+	single, err := pdf.Open(filename)
 	if err != nil {
 		log.Fatalln(errgo.Details(err))
 	}
+	defer single.Close()
 
 	// create references to input pages
 	catalog := single.Get(single.Root).(pdf.Dictionary)
@@ -232,16 +232,10 @@ func main() {
 	}
 
 	// close files
-	err = single.SaveAs(output_filename)
+	err = single.Save()
 	if err != nil {
 		log.Fatalln(errgo.Details(err))
 	}
-
-	err = single.Close()
-	if err != nil {
-		log.Fatalln(errgo.Details(err))
-	}
-
 }
 
 // transforms the page tree from the file into an array of pages

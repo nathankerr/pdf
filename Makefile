@@ -1,8 +1,9 @@
 all:
 	go fmt ./...
 	go install -v github.com/nathankerr/pdf
-	go run examples/book.go paper.pdf paper-single.pdf
-	open paper-single.pdf
+	cp paper.pdf paper-modified.pdf
+	go run examples/single.go paper-modified.pdf
+	open paper-modified.pdf
 
 test:
 	go test -i github.com/nathankerr/pdf/file

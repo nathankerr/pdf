@@ -15,15 +15,14 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 
 	// Process arguments
-	if len(os.Args) != 3 {
-		log.Fatalln("Usage: chapbook [input.pdf] [output.pdf]")
+	if len(os.Args) != 2 {
+		log.Fatalln("Usage: book [file.pdf]")
 	}
 
-	input_filename := os.Args[1]
-	output_filename := os.Args[2]
+	filename := os.Args[1]
 
 	// open pdf document
-	chapbook, err := pdf.Open(input_filename)
+	chapbook, err := pdf.Open(filename)
 	if err != nil {
 		log.Fatalln(errgo.Details(err))
 	}
@@ -213,7 +212,7 @@ func main() {
 	}
 
 	// close files
-	err = chapbook.SaveAs(output_filename)
+	err = chapbook.Save()
 	if err != nil {
 		log.Fatalln(errgo.Details(err))
 	}
