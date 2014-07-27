@@ -100,7 +100,7 @@ func parseObject(slice []byte) (Object, int, error) {
 			if !ok {
 				object = Stream{
 					Dictionary: dict,
-					Stream: slice[start+n:],
+					Stream:     slice[start+n:],
 				}
 			} else {
 				streamLength := int(streamLengthInteger)
