@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/juju/errgo"
 	"github.com/nathankerr/pdf"
 	"log"
 	"math"
@@ -18,32 +17,31 @@ func main() {
 	if len(os.Args) != 2 {
 		log.Fatalln("Usage: single [file.pdf]")
 	}
-
 	filename := os.Args[1]
 
 	// open pdf document
 	single, err := pdf.Open(filename)
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 	defer single.Close()
 
 	// create references to input pages
 	catalog := single.Get(single.Root).(pdf.Dictionary)
-	pages := getPages(single, catalog[pdf.Name("Pages")].(pdf.ObjectReference))
+	pages := getPages(single, catalog["Pages"].(pdf.ObjectReference))
 
 	// output to A4
 	paper_width := 595.224
 	paper_height := 841.824
 
 	// assume that all pages are the same size
-	media_box_obj := pages[0].Object.(pdf.Dictionary)[pdf.Name("MediaBox")]
+	media_box_obj := pages[0].Object.(pdf.Dictionary)["MediaBox"]
 	var media_box pdf.Array
 	if media_box_obj == nil {
 		// the first page inherits its MediaBox, therefore get it from the root
-		pages_ref := catalog[pdf.Name("Pages")].(pdf.ObjectReference)
+		pages_ref := catalog["Pages"].(pdf.ObjectReference)
 		pages := single.Get(pages_ref)
-		media_box = pages.(pdf.Dictionary)[pdf.Name("MediaBox")].(pdf.Array)
+		media_box = pages.(pdf.Dictionary)["MediaBox"].(pdf.Array)
 	} else {
 		media_box = media_box_obj.(pdf.Array)
 	}
@@ -109,31 +107,30 @@ func main() {
 	for page_num, page := range pages {
 		page := page.Object.(pdf.Dictionary)
 
-		// change the dict. values
-		page[pdf.Name("Type")] = pdf.Name("XObject")
-		page[pdf.Name("Subtype")] = pdf.Name("Form")
-		page[pdf.Name("BBox")] = media_box
+		page["Type"] = pdf.Name("XObject")
+		page["Subtype"] = pdf.Name("Form")
+		page["BBox"] = media_box
 
 		// consolidate the contents
 		contents := []byte{}
-		switch typed := page[pdf.Name("Contents")].(type) {
+		switch typed := page["Contents"].(type) {
 		case pdf.ObjectReference:
 			page_contents_obj := single.Get(typed)
 			page_contents := page_contents_obj.(pdf.Stream)
 			contents = page_contents.Stream
-			page[pdf.Name("Filter")] = page_contents.Dictionary[pdf.Name("Filter")]
+			page["Filter"] = page_contents.Dictionary["Filter"]
 		case pdf.Array:
 			if len(typed) == 1 {
 				page_contents_obj := single.Get(typed[0].(pdf.ObjectReference))
 				page_contents := page_contents_obj.(pdf.Stream)
 				contents = page_contents.Stream
-				page[pdf.Name("Filter")] = page_contents.Dictionary[pdf.Name("Filter")]
+				page["Filter"] = page_contents.Dictionary["Filter"]
 			} else {
 				for _, page_contents_ref := range typed {
 					page_contents_obj := single.Get(page_contents_ref.(pdf.ObjectReference))
 					decoded, err := page_contents_obj.(pdf.Stream).Decode()
 					if err != nil {
-						log.Fatalln(errgo.Details(err))
+						log.Fatalln(err)
 					}
 
 					contents = append(contents, decoded...)
@@ -149,18 +146,16 @@ func main() {
 			Stream:     contents,
 		})
 		if err != nil {
-			log.Fatalln(errgo.Details(err))
+			log.Fatalln(err)
 		}
 
-		// add to the single page
+		// draw the page
 		page_name := fmt.Sprintf("Page%d", page_num)
 		xobjects[pdf.Name(page_name)] = xobj_ref
+		stream.WriteString("/" + page_name + " Do ")
 
 		// draw rectangle around the page
 		fmt.Fprintf(stream, "0 0 %v %v re S ", page_width, page_height)
-
-		// draw the page
-		stream.WriteString("/" + page_name + " Do ")
 
 		// move to where the next page goes
 		if (page_num+1)%nx == 0 {
@@ -178,7 +173,7 @@ func main() {
 	}
 	single_pages_ref, err := single.Add(single_pages)
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 
 	// content for single page
@@ -187,7 +182,7 @@ func main() {
 	}
 	contents_ref, err := single.Add(contents)
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 
 	// add page
@@ -207,34 +202,34 @@ func main() {
 	}
 	single_page_ref, err := single.Add(single_page)
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 
 	// update pages list
-	single_pages[pdf.Name("Kids")] = pdf.Array{single_page_ref}
-	single_pages[pdf.Name("Count")] = pdf.Integer(1)
+	single_pages["Kids"] = pdf.Array{single_page_ref}
+	single_pages["Count"] = pdf.Integer(1)
 	_, err = single.Add(pdf.IndirectObject{
 		ObjectReference: single_pages_ref,
 		Object:          single_pages,
 	})
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 
 	// catalog for single
-	catalog[pdf.Name("Pages")] = single_pages_ref
+	catalog["Pages"] = single_pages_ref
 	_, err = single.Add(pdf.IndirectObject{
 		ObjectReference: single.Root,
 		Object:          catalog,
 	})
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 
 	// close files
 	err = single.Save()
 	if err != nil {
-		log.Fatalln(errgo.Details(err))
+		log.Fatalln(err)
 	}
 }
 
@@ -243,9 +238,9 @@ func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.IndirectObject {
 	pages := []pdf.IndirectObject{}
 	page_node := file.Get(ref).(pdf.Dictionary)
 
-	switch page_node[pdf.Name("Type")] {
+	switch page_node["Type"] {
 	case pdf.Name("Pages"):
-		for _, kid_ref := range page_node[pdf.Name("Kids")].(pdf.Array) {
+		for _, kid_ref := range page_node["Kids"].(pdf.Array) {
 			kid_pages := getPages(file, kid_ref.(pdf.ObjectReference))
 			pages = append(pages, kid_pages...)
 		}
@@ -255,7 +250,7 @@ func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.IndirectObject {
 			Object:          page_node,
 		})
 	default:
-		panic(string(page_node[pdf.Name("Type")].(pdf.Name)))
+		panic(string(page_node["Type"].(pdf.Name)))
 	}
 
 	return pages
