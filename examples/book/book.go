@@ -44,45 +44,44 @@ func main() {
 	defer book.Close()
 
 	// get the pdf page references
-	catalog := book.Get(book.Root).(pdf.Dictionary)
-	pages := getPages(book, catalog["Pages"].(pdf.ObjectReference))
+	pagesRef := book.Get(book.Root).(pdf.Dictionary)["Pages"].(pdf.ObjectReference)
+	pages := getPages(book, pagesRef)
 
 	// assuming that all pages are the same size, figure out the
 	// media box that will be the bbox of the xobject
-	media_box_obj := pages[0]["MediaBox"]
-	var media_box pdf.Array
-	if media_box_obj == nil {
+	mediaBoxObj := pages[0]["MediaBox"]
+	var mediaBox pdf.Array
+	if mediaBoxObj == nil {
 		// the first page inherits its MediaBox, therefore get it from the root
-		pages_ref := catalog["Pages"].(pdf.ObjectReference)
-		pages := book.Get(pages_ref)
-		media_box = pages.(pdf.Dictionary)["MediaBox"].(pdf.Array)
+		pages := book.Get(pagesRef)
+		mediaBox = pages.(pdf.Dictionary)["MediaBox"].(pdf.Array)
 	} else {
-		media_box = media_box_obj.(pdf.Array)
+		mediaBox = mediaBoxObj.(pdf.Array)
 	}
 
 	// change the pages to xobjects
-	page_xobjects := []pdf.ObjectReference{}
+	pageXobjects := []pdf.ObjectReference{}
 	for _, page := range pages {
 		page["Type"] = pdf.Name("XObject")
 		page["Subtype"] = pdf.Name("Form")
-		page["BBox"] = media_box
+		page["BBox"] = mediaBox
 
 		// consolidate the contents into the xobject stream
 		contents := []byte{}
 		switch typed := page["Contents"].(type) {
 		case pdf.ObjectReference:
-			page_contents := book.Get(typed).(pdf.Stream)
-			contents = page_contents.Stream
-			page["Filter"] = page_contents.Dictionary["Filter"]
+			pageContents := book.Get(typed).(pdf.Stream)
+			contents = pageContents.Stream
+			page["Filter"] = pageContents.Dictionary["Filter"]
 		case pdf.Array:
 			if len(typed) == 1 {
-				page_contents := book.Get(typed[0].(pdf.ObjectReference)).(pdf.Stream)
-				contents = page_contents.Stream
-				page["Filter"] = page_contents.Dictionary["Filter"]
+				pageContents := book.Get(typed[0].(pdf.ObjectReference)).(pdf.Stream)
+				contents = pageContents.Stream
+				page["Filter"] = pageContents.Dictionary["Filter"]
 			} else {
-				for _, page_contents_ref := range typed {
-					page_contents := book.Get(page_contents_ref.(pdf.ObjectReference)).(pdf.Stream)
-					decoded, err := page_contents.Decode()
+				for _, pageContentsRef := range typed {
+					pageContents := book.Get(pageContentsRef.(pdf.ObjectReference)).(pdf.Stream)
+					decoded, err := pageContents.Decode()
 					if err != nil {
 						log.Fatalln(err)
 					}
@@ -96,140 +95,140 @@ func main() {
 		delete(page, "Contents")
 
 		// add the xobject to the pdf
-		xobj_ref, err := book.Add(pdf.Stream{
+		xobjRef, err := book.Add(pdf.Stream{
 			Dictionary: page,
 			Stream:     contents,
 		})
 		if err != nil {
 			log.Fatalln(err)
 		}
-		page_xobjects = append(page_xobjects, xobj_ref)
+		pageXobjects = append(pageXobjects, xobjRef)
 	}
 
 	// figure out how many pages to layout for
-	num_document_pages := len(pages)
-	num_pages_to_layout := num_document_pages
+	numDocumentPages := len(pages)
+	numPagesToLayout := numDocumentPages
 	switch *binding {
 	case "perfect", "chapbook":
-		if (num_pages_to_layout % 4) != 0 {
-			num_pages_to_layout = num_document_pages + (4 - (num_document_pages % 4))
+		if (numPagesToLayout % 4) != 0 {
+			numPagesToLayout = numDocumentPages + (4 - (numDocumentPages % 4))
 		}
 	case "none":
-		num_document_pages++
-		if (num_pages_to_layout % 2) != 0 {
-			num_pages_to_layout++
+		numDocumentPages++
+		if (numPagesToLayout % 2) != 0 {
+			numPagesToLayout++
 		}
 	}
 
 	// layout on landscape version of page size
-	paper_height := toFloat64(media_box[3])      // same height as the original page
-	paper_width := toFloat64(media_box[2]) * 2.0 // twice the width of the original page
+	paperHeight := toFloat64(mediaBox[3])      // same height as the original page
+	paperWidth := toFloat64(mediaBox[2]) * 2.0 // twice the width of the original page
 
 	// layout the pages
-	layed_out_pages := pdf.Array{}
+	layedOutPages := pdf.Array{}
 	stream := &bytes.Buffer{}
 	xobjects := pdf.Dictionary{}
-	show_page := false
-	flip_next_page := true
-	for page_to_layout := 0; page_to_layout < num_pages_to_layout; page_to_layout++ {
-		var page_num int
+	showPage := false
+	flipNextPage := true
+	for pageToLayout := 0; pageToLayout < numPagesToLayout; pageToLayout++ {
+		var pageNum int
 		switch *binding {
 		case "perfect":
 			// determine the real page number for perfect bound books
-			page_num = page_to_layout - 1
-			if page_to_layout%4 == 0 {
-				page_num += 4
+			pageNum = pageToLayout - 1
+			if pageToLayout%4 == 0 {
+				pageNum += 4
 			}
 		case "chapbook":
 			// determine the real page number for chapbooks
-			page_num = page_to_layout / 2
-			if page_to_layout%2 == 1 {
-				page_num = num_pages_to_layout - page_num - 1
+			pageNum = pageToLayout / 2
+			if pageToLayout%2 == 1 {
+				pageNum = numPagesToLayout - pageNum - 1
 			}
 		case "none":
-			page_num = page_to_layout - 1
-			flip_next_page = false
+			pageNum = pageToLayout - 1
+			flipNextPage = false
 		default:
 			log.Println("unhandled binding:", *binding)
 			usage()
 		}
 
 		// only render non-blank pages
-		if page_num < num_document_pages && page_num >= 0 {
+		if pageNum < numDocumentPages && pageNum >= 0 {
 			fmt.Fprintf(stream, "q ")
 			// horizontal offset for recto (odd) pages
 			// this correctly handles 0 based indexes for 1 based page numbers
-			if page_num%2 == 0 {
-				fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", paper_width/2.0, 0)
+			if pageNum%2 == 0 {
+				fmt.Fprintf(stream, "1 0 0 1 %v %v cm ", paperWidth/2.0, 0)
 			}
 
 			// render the page
-			page_name := fmt.Sprintf("Page%d", page_num)
-			xobjects[pdf.Name(page_name)] = page_xobjects[page_num]
-			fmt.Fprintf(stream, "/%v Do Q ", page_name)
+			pageName := fmt.Sprintf("Page%d", pageNum)
+			xobjects[pdf.Name(pageName)] = pageXobjects[pageNum]
+			fmt.Fprintf(stream, "/%v Do Q ", pageName)
 		}
 
 		// emit layouts after drawing both pages
-		if show_page {
+		if showPage {
 			// content for book page
 			contents := pdf.Stream{
 				Stream: stream.Bytes(),
 			}
-			contents_ref, err := book.Add(contents)
+			contentsRef, err := book.Add(contents)
 			if err != nil {
 				log.Fatalln(err)
 			}
 
 			// add page
-			book_page := pdf.Dictionary{
+			bookPage := pdf.Dictionary{
 				pdf.Name("Type"):   pdf.Name("Page"),
-				pdf.Name("Parent"): catalog["Pages"],
+				pdf.Name("Parent"): pagesRef,
 				pdf.Name("Resources"): pdf.Dictionary{
 					pdf.Name("XObject"): xobjects,
 				},
-				pdf.Name("Contents"): contents_ref,
+				pdf.Name("Contents"): contentsRef,
 			}
-			book_page_ref, err := book.Add(book_page)
+			bookPageRef, err := book.Add(bookPage)
 			if err != nil {
 				log.Fatalln(err)
 			}
-			layed_out_pages = append(layed_out_pages, book_page_ref)
+			layedOutPages = append(layedOutPages, bookPageRef)
 
 			// reset the stream and xobjects
 			stream = &bytes.Buffer{}
 			xobjects = pdf.Dictionary{}
 
 			// flip the next page over
-			if flip_next_page {
+			if flipNextPage {
 				fmt.Fprintf(stream, "%f %f %f %f %v %v cm ",
 					math.Cos(math.Pi),
 					math.Sin(math.Pi),
 					-math.Sin(math.Pi),
 					math.Cos(math.Pi),
-					paper_width,
-					paper_height,
+					paperWidth,
+					paperHeight,
 				)
 			}
-			flip_next_page = !flip_next_page
+			flipNextPage = !flipNextPage
 		}
-		show_page = !show_page
+		showPage = !showPage
 	}
 
 	// Page tree for book
-	book_pages := pdf.Dictionary{
+	bookPages := pdf.Dictionary{
 		"Type":  pdf.Name("Pages"),
-		"Kids":  layed_out_pages,
-		"Count": pdf.Integer(len(layed_out_pages)),
+		"Kids":  layedOutPages,
+		"Count": pdf.Integer(len(layedOutPages)),
 		"MediaBox": pdf.Array{
 			pdf.Integer(0),
 			pdf.Integer(0),
-			pdf.Real(paper_width),  // width
-			pdf.Real(paper_height), // height
+			pdf.Real(paperWidth),  // width
+			pdf.Real(paperHeight), // height
 		},
 	}
 	_, err = book.Add(pdf.IndirectObject{
-		ObjectReference: catalog["Pages"].(pdf.ObjectReference),
-		Object:          book_pages,
+		ObjectReference: pagesRef,
+		Object:          bookPages,
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -245,18 +244,18 @@ func main() {
 // transforms the page tree from the file into an array of pages
 func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.Dictionary {
 	pages := []pdf.Dictionary{}
-	page_node := file.Get(ref).(pdf.Dictionary)
+	pageNode := file.Get(ref).(pdf.Dictionary)
 
-	switch page_node["Type"] {
+	switch pageNode["Type"] {
 	case pdf.Name("Pages"):
-		for _, kid_ref := range page_node["Kids"].(pdf.Array) {
-			kid_pages := getPages(file, kid_ref.(pdf.ObjectReference))
-			pages = append(pages, kid_pages...)
+		for _, kidRef := range pageNode["Kids"].(pdf.Array) {
+			kidPages := getPages(file, kidRef.(pdf.ObjectReference))
+			pages = append(pages, kidPages...)
 		}
 	case pdf.Name("Page"):
-		pages = append(pages, page_node)
+		pages = append(pages, pageNode)
 	default:
-		panic(string(page_node["Type"].(pdf.Name)))
+		panic(string(pageNode["Type"].(pdf.Name)))
 	}
 
 	return pages
