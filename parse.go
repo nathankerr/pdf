@@ -531,7 +531,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	}
 
 	// stream objects might not have determinable lengths, and so cannot be fully parsed
-	if stream, is_stream := object.(Stream); is_stream {
+	if stream, isStream := object.(Stream); isStream {
 		if _, isObjectRef := stream.Dictionary["Length"].(ObjectReference); isObjectRef {
 			return io, i, nil
 		}

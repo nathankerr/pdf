@@ -235,7 +235,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 		existing, ok := f.objects[ref.ObjectNumber]
 		if ok {
 			// determine the minimum allowed generation number
-			var minGenerationNumber uint = 0
+			var minGenerationNumber uint
 			switch typed := existing.(type) {
 			case crossReference: // existing object
 				switch typed[0] {
@@ -661,6 +661,8 @@ func (f *File) Close() error {
 	return nil
 }
 
+// Free the object with the specified number.
+// Will automatically determine and increment the generation number.
 func (f *File) Free(objectNumber uint) {
 	obj, ok := f.objects[objectNumber]
 	if !ok {

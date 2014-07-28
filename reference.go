@@ -62,7 +62,7 @@ func (file *File) loadReferences() error {
 	}
 	xrefOffset := int(xrefOffset64)
 
-	refs, trailer, err := file.load_references(xrefOffset)
+	refs, trailer, err := file.loadReferencesHelper(xrefOffset)
 	if err != nil {
 		return err
 	}
@@ -95,8 +95,8 @@ func (file *File) loadReferences() error {
 }
 
 // parse and recursively load and merge references and trailer
-func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Dictionary, error) {
-	// fmt.Println("load_references", xrefOffset)
+func (file *File) loadReferencesHelper(xrefOffset int) (map[uint]interface{}, Dictionary, error) {
+	// fmt.Println("loadReferencesHelper", xrefOffset)
 
 	// parse refs, trailer
 	refs := map[uint]interface{}{}
@@ -202,40 +202,39 @@ func (file *File) load_references(xrefOffset int) (map[uint]interface{}, Diction
 	}
 
 	// previous references are masked by the current one
-	prev, has_prev := trailer[Name("Prev")]
-	if has_prev {
-		prev_refs, prev_trailer, err := file.load_references(int(prev.(Integer)))
+	prev, hasPrev := trailer[Name("Prev")]
+	if hasPrev {
+		prevRefs, prevTrailer, err := file.loadReferencesHelper(int(prev.(Integer)))
 		if err != nil {
 			return refs, trailer, err
 		}
 
-		for prev_ref := range prev_refs {
-			if _, ok := refs[prev_ref]; !ok {
-				refs[prev_ref] = prev_refs[prev_ref]
+		for prevRef := range prevRefs {
+			if _, ok := refs[prevRef]; !ok {
+				refs[prevRef] = prevRefs[prevRef]
 			}
 		}
 
-		for name := range prev_trailer {
+		for name := range prevTrailer {
 			if _, ok := trailer[name]; !ok {
-				trailer[name] = prev_trailer[name]
+				trailer[name] = prevTrailer[name]
 			}
 		}
 	}
 
 	// hybrid references mask current ones
-	hybrid, has_hybrid := trailer[Name("XRefStm")]
-	if has_hybrid {
-		hybrid_refs, hybrid_trailer, err := file.load_references(int(hybrid.(Integer)))
+	if hybrid, hasHybrid := trailer[Name("XRefStm")]; hasHybrid {
+		hybridRefs, hybridTrailer, err := file.loadReferencesHelper(int(hybrid.(Integer)))
 		if err != nil {
 			return refs, trailer, err
 		}
 
-		for hybrid_ref := range hybrid_refs {
-			refs[hybrid_ref] = hybrid_refs[hybrid_ref]
+		for hybridRef := range hybridRefs {
+			refs[hybridRef] = hybridRefs[hybridRef]
 		}
 
-		for name := range hybrid_trailer {
-			trailer[name] = hybrid_trailer[name]
+		for name := range hybridTrailer {
+			trailer[name] = hybridTrailer[name]
 		}
 	}
 
