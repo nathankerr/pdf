@@ -62,7 +62,7 @@ func (file *File) loadReferences() error {
 	}
 	xrefOffset := int(xrefOffset64)
 
-	refs, trailer, err := file.loadReferencesHelper(xrefOffset)
+	refs, trailer, err := file.parseReferences(xrefOffset)
 	if err != nil {
 		return err
 	}
@@ -95,8 +95,8 @@ func (file *File) loadReferences() error {
 }
 
 // parse and recursively load and merge references and trailer
-func (file *File) loadReferencesHelper(xrefOffset int) (map[uint]interface{}, Dictionary, error) {
-	// fmt.Println("loadReferencesHelper", xrefOffset)
+func (file *File) parseReferences(xrefOffset int) (map[uint]interface{}, Dictionary, error) {
+	// fmt.Println("parseReferences", xrefOffset)
 
 	// parse refs, trailer
 	refs := map[uint]interface{}{}
@@ -204,7 +204,7 @@ func (file *File) loadReferencesHelper(xrefOffset int) (map[uint]interface{}, Di
 	// previous references are masked by the current one
 	prev, hasPrev := trailer[Name("Prev")]
 	if hasPrev {
-		prevRefs, prevTrailer, err := file.loadReferencesHelper(int(prev.(Integer)))
+		prevRefs, prevTrailer, err := file.parseReferences(int(prev.(Integer)))
 		if err != nil {
 			return refs, trailer, err
 		}
@@ -224,7 +224,7 @@ func (file *File) loadReferencesHelper(xrefOffset int) (map[uint]interface{}, Di
 
 	// hybrid references mask current ones
 	if hybrid, hasHybrid := trailer[Name("XRefStm")]; hasHybrid {
-		hybridRefs, hybridTrailer, err := file.loadReferencesHelper(int(hybrid.(Integer)))
+		hybridRefs, hybridTrailer, err := file.parseReferences(int(hybrid.(Integer)))
 		if err != nil {
 			return refs, trailer, err
 		}
