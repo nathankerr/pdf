@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"github.com/nathankerr/pdf"
 	"log"
@@ -10,14 +11,30 @@ import (
 	"reflect"
 )
 
+func usage() {
+	fmt.Printf("Usage: book [options] <file.pdf>\n\nOptions:\n")
+	flag.PrintDefaults()
+	os.Exit(1)
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	// Process arguments
-	if len(os.Args) != 2 {
-		log.Fatalln("Usage: book [file.pdf]")
+	binding := flag.String("binding", "chapbook", "Type of binding to generate {perfect, chapbook, none}. Default is chapbook.")
+	flag.Parse()
+
+	switch *binding {
+	case "chapbook", "perfect", "none":
+		// no-op
+	default:
+		usage()
 	}
-	filename := os.Args[1]
+
+	// Process arguments
+	if flag.NArg() != 1 {
+		usage()
+	}
+	filename := flag.Arg(0)
 
 	// open pdf document
 	book, err := pdf.Open(filename)
@@ -107,14 +124,28 @@ func main() {
 	show_page := false
 	flip_next_page := true
 	for page_to_layout := 0; page_to_layout < num_pages_to_layout; page_to_layout++ {
-		// determine the real page number for perfect bound books
-		page_num := page_to_layout - 1
-		if page_to_layout%4 == 0 {
-			page_num += 4
+		var page_num int
+		switch *binding {
+		case "perfect":
+			// determine the real page number for perfect bound books
+			page_num = page_to_layout - 1
+			if page_to_layout%4 == 0 {
+				page_num += 4
+			}
+		case "chapbook":
+			// determine the real page number for chapbooks
+			page_num = page_to_layout / 2
+			if page_to_layout%2 == 1 {
+				page_num = num_pages_to_layout - page_num - 1
+			}
+		default:
+			log.Println("unhandled binding:", *binding)
+			usage()
 		}
 
 		// only render non-blank pages
 		if page_num < num_document_pages {
+			fmt.Fprintf(stream, "q ")
 			// horizontal offset for recto (odd) pages
 			// this correctly handles 0 based indexes for 1 based page numbers
 			if page_num%2 == 0 {
@@ -124,7 +155,7 @@ func main() {
 			// render the page
 			page_name := fmt.Sprintf("Page%d", page_num)
 			xobjects[pdf.Name(page_name)] = page_xobjects[page_num]
-			fmt.Fprintf(stream, "/%v Do ", page_name)
+			fmt.Fprintf(stream, "/%v Do Q ", page_name)
 		}
 
 		// emit layouts after drawing both pages
