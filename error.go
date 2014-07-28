@@ -6,7 +6,8 @@ import (
 	"runtime"
 )
 
-type Error struct {
+// an error stack
+type pdfError struct {
 	error
 
 	message string
@@ -16,7 +17,7 @@ type Error struct {
 	line        int
 }
 
-func (err Error) Error() string {
+func (err pdfError) Error() string {
 	buf := &bytes.Buffer{}
 
 	if err.hasLocation {
@@ -29,15 +30,14 @@ func (err Error) Error() string {
 		fmt.Fprintf(buf, ": %v", err.error)
 	}
 
-	// return fmt.Sprintf("%v:%v: %v: %v", err.file, err.line, err.message, err.error)
 	return buf.String()
 }
 
-func (err Error) String() string {
+func (err pdfError) String() string {
 	return err.Error()
 }
 
-func (err *Error) setLocation() {
+func (err *pdfError) setLocation() {
 	if _, file, line, ok := runtime.Caller(2); ok {
 		err.hasLocation = true
 		err.file = file
@@ -46,7 +46,7 @@ func (err *Error) setLocation() {
 }
 
 func newErr(message string) error {
-	err := &Error{
+	err := &pdfError{
 		message: message,
 	}
 	err.setLocation()
@@ -54,7 +54,7 @@ func newErr(message string) error {
 }
 
 func newErrf(format string, args ...interface{}) error {
-	err := &Error{
+	err := &pdfError{
 		message: fmt.Sprintf(format, args...),
 	}
 	err.setLocation()
@@ -66,7 +66,7 @@ func maskErr(err error) error {
 		return nil
 	}
 
-	masked := &Error{
+	masked := &pdfError{
 		message: err.Error(),
 	}
 
@@ -76,7 +76,7 @@ func maskErr(err error) error {
 }
 
 func pushErr(err error, message string) error {
-	pushed := Error{
+	pushed := pdfError{
 		error:   err,
 		message: message,
 	}
@@ -87,7 +87,7 @@ func pushErr(err error, message string) error {
 }
 
 func pushErrf(err error, format string, args ...interface{}) error {
-	pushed := Error{
+	pushed := pdfError{
 		error:   err,
 		message: fmt.Sprintf(format, args...),
 	}
