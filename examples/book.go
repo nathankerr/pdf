@@ -109,8 +109,16 @@ func main() {
 	// figure out how many pages to layout for
 	num_document_pages := len(pages)
 	num_pages_to_layout := num_document_pages
-	if (num_pages_to_layout % 4) != 0 {
-		num_pages_to_layout = num_document_pages + (4 - (num_document_pages % 4))
+	switch *binding {
+	case "perfect", "chapbook":
+		if (num_pages_to_layout % 4) != 0 {
+			num_pages_to_layout = num_document_pages + (4 - (num_document_pages % 4))
+		}
+	case "none":
+		num_document_pages++
+		if (num_pages_to_layout % 2) != 0 {
+			num_pages_to_layout++
+		}
 	}
 
 	// layout on landscape version of page size
@@ -138,13 +146,16 @@ func main() {
 			if page_to_layout%2 == 1 {
 				page_num = num_pages_to_layout - page_num - 1
 			}
+		case "none":
+			page_num = page_to_layout - 1
+			flip_next_page = false
 		default:
 			log.Println("unhandled binding:", *binding)
 			usage()
 		}
 
 		// only render non-blank pages
-		if page_num < num_document_pages {
+		if page_num < num_document_pages && page_num >= 0 {
 			fmt.Fprintf(stream, "q ")
 			// horizontal offset for recto (odd) pages
 			// this correctly handles 0 based indexes for 1 based page numbers
