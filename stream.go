@@ -4,7 +4,6 @@ import (
 	"encoding/ascii85"
 	"errors"
 	"fmt"
-	"reflect"
 	// "compress/lzw"
 	"bytes"
 	"compress/flate"
@@ -31,7 +30,7 @@ func (s Stream) Decode() ([]byte, error) {
 			filters = append(filters, filter.(Name))
 		}
 	default:
-		panic(fmt.Sprintf("unhandled type: %v", reflect.TypeOf(streamFilter).String()))
+		panic(fmt.Sprintf("unhandled type: %T", streamFilter))
 	}
 
 	// extract the filter parameters
@@ -45,7 +44,7 @@ func (s Stream) Decode() ([]byte, error) {
 				parameters = append(parameters, parameter.(Dictionary))
 			}
 		default:
-			panic(fmt.Sprintf("unhandled type: %v", reflect.TypeOf(streamParameter).String()))
+			panic(fmt.Sprintf("unhandled type: %T", streamParameter))
 		}
 	}
 

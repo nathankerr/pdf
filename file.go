@@ -10,7 +10,6 @@ import (
 	"github.com/edsrzf/mmap-go"
 	"io"
 	"os"
-	"reflect"
 	"sort"
 )
 
@@ -196,7 +195,7 @@ func (f *File) Get(reference ObjectReference) Object {
 	case freeObject: // newly freed object
 		return Null{newErrf("%v freed after pdf was loaded", reference)}
 	default:
-		panic("unhandled type: " + reflect.TypeOf(object).Name())
+		panic(fmt.Sprintf("unhandled type: %T", object))
 	}
 
 	// deal with streams that have references to lengths
@@ -255,7 +254,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 			case freeObject: // newly freed object
 				minGenerationNumber = uint(typed)
 			default:
-				panic("unhandled type: " + reflect.TypeOf(typed).Name())
+				panic(fmt.Sprintf("unhandled type: %T", typed))
 			}
 
 			if ref.GenerationNumber < minGenerationNumber {
@@ -350,7 +349,7 @@ func (f *File) saveUsingXrefTable() error {
 			xrefs[Integer(i)] = crossReference{0, 0, uint(typed)}
 			free = append(free, int(i))
 		default:
-			panic("unhandled type: " + reflect.TypeOf(typed).Name())
+			panic(fmt.Sprintf("unhandled type: %T", typed))
 		}
 	}
 
@@ -504,7 +503,7 @@ func (f *File) saveUsingXrefStream() error {
 			xrefs[Integer(i)] = crossReference{0, 0, uint(typed)}
 			free = append(free, int(i))
 		default:
-			panic("unhandled type: " + reflect.TypeOf(typed).Name())
+			panic(fmt.Sprintf("unhandled type: %T", typed))
 		}
 	}
 
@@ -691,6 +690,6 @@ func (f *File) Free(objectNumber uint) {
 		// no-op
 		// already free
 	default:
-		panic("unhandled type: " + reflect.TypeOf(typed).Name())
+		panic(fmt.Sprintf("unhandled type: %T", typed))
 	}
 }
