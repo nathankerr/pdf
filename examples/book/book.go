@@ -251,9 +251,11 @@ func getPages(file *pdf.File, ref pdf.ObjectReference) []pdf.Dictionary {
 		for _, kidRef := range pageNode["Kids"].(pdf.Array) {
 			kidPages := getPages(file, kidRef.(pdf.ObjectReference))
 			pages = append(pages, kidPages...)
+			file.Free(kidRef.(pdf.ObjectReference).ObjectNumber)
 		}
 	case pdf.Name("Page"):
 		pages = append(pages, pageNode)
+		file.Free(ref.ObjectNumber)
 	default:
 		panic(string(pageNode["Type"].(pdf.Name)))
 	}
