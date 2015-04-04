@@ -104,11 +104,11 @@ func Create(filename string) (*File, error) {
 
 // Get returns the referenced object.
 // When the object does not exist, Null is returned.
-func (f *File) Get(reference ObjectReference) Object {
-	// fmt.Println("getting: ", reference)
-	objectRaw, ok := f.objects[reference.ObjectNumber]
+func (f *File) Get(ref ObjectReference) Object {
+	// fmt.Println("getting: ", ref)
+	objectRaw, ok := f.objects[ref.ObjectNumber]
 	if !ok {
-		return Null{newErrf("%s not found", reference)}
+		return Null{newErrf("%s not found", ref)}
 	}
 
 	var object Object
@@ -117,21 +117,21 @@ func (f *File) Get(reference ObjectReference) Object {
 	case crossReference: // existing object
 		switch typed[0] {
 		case 0: // free entry
-			return Null{newErrf("%s is a free object", reference)}
+			return Null{newErrf("%s is a free object", ref)}
 		case 1: // normal
 			offset := typed[1] - 1
 			obj, _, err := parseIndirectObject(f.mmap[offset:])
 			if err != nil {
-				return Null{pushErrf(err, "Error parsing %s", reference)}
+				return Null{pushErrf(err, "Error parsing %s", ref)}
 			}
 
 			iobj, ok := obj.(IndirectObject)
 			if !ok {
-				return Null{newErrf("%v is not an indirect object", reference)}
+				return Null{newErrf("%v is not an indirect object", ref)}
 			}
 
 			if iobj.Object == nil {
-				return Null{newErrf("%v's object is nil", reference)}
+				return Null{newErrf("%v's object is nil", ref)}
 			}
 			object = iobj.Object
 		case 2: // in object stream
@@ -139,7 +139,7 @@ func (f *File) Get(reference ObjectReference) Object {
 			objectStreamRef := ObjectReference{ObjectNumber: typed[1]}
 			objectStream, ok := f.Get(objectStreamRef).(Stream)
 			if !ok {
-				return Null{newErrf("%v should be in object stream %v, but %v is not a stream", reference, objectStreamRef, objectStreamRef)}
+				return Null{newErrf("%v should be in object stream %v, but %v is not a stream", ref, objectStreamRef, objectStreamRef)}
 			}
 
 			// parse the index (object number and offset pairs)
@@ -168,8 +168,8 @@ func (f *File) Get(reference ObjectReference) Object {
 
 			// if the index from the cross reference is wrong,
 			// find the correct offset
-			if objectNumber != Integer(reference.ObjectNumber) {
-				objectNumber = Integer(reference.ObjectNumber)
+			if objectNumber != Integer(ref.ObjectNumber) {
+				objectNumber = Integer(ref.ObjectNumber)
 				for i := 0; i < len(index); i += 2 {
 					if index[i] == objectNumber {
 						offset = int(index[i+1])
@@ -193,12 +193,12 @@ func (f *File) Get(reference ObjectReference) Object {
 		}
 		object = typed.Object
 	case freeObject: // newly freed object
-		return Null{newErrf("%v freed after pdf was loaded", reference)}
+		return Null{newErrf("%v freed after pdf was loaded", ref)}
 	default:
 		panic(fmt.Sprintf("unhandled type: %T", object))
 	}
 
-	// deal with streams that have references to lengths
+	// deal with streams that have refs to lengths
 	if streamObj, ok := object.(Stream); ok {
 		if lengthRef, ok := streamObj.Dictionary["Length"].(ObjectReference); ok {
 			length := f.Get(lengthRef).(Integer)
