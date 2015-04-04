@@ -241,7 +241,7 @@ func (file *File) parseReferences(xrefOffset int) (map[uint]interface{}, Diction
 	return refs, trailer, nil
 }
 
-func bytesToInt(bytesOfInt []byte) int {
+func bytesToInt(bytesOfInt []byte) uint {
 	// pad bytesOfInt so that it fits an uint64
 	const sizeOfUint64 = 8
 	diff := sizeOfUint64 - len(bytesOfInt)
@@ -254,13 +254,13 @@ func bytesToInt(bytesOfInt []byte) int {
 	if err != nil {
 		panic(err)
 	}
-	return int(value)
+	return uint(value)
 }
 
 // Number of bytes required to encode value
 func nBytesForInt(value int) int {
 	i := 1
-	for value > (1 << uint(8*i)) {
+	for value >= (1 << uint(8*i)) {
 		i++
 	}
 	return i

@@ -8,7 +8,7 @@ import (
 func TestBytesToInt(t *testing.T) {
 	type test struct {
 		b []byte
-		v int
+		v uint
 	}
 	tests := []test{
 		test{[]byte{0x0, 0x0, 0x0}, 0},
@@ -50,7 +50,7 @@ func TestNBytesForInt(t *testing.T) {
 func TestIntToBytes(t *testing.T) {
 	type test struct {
 		b []byte
-		v int
+		v uint
 	}
 	tests := []test{
 		test{[]byte{0x0}, 0},
@@ -71,7 +71,7 @@ func TestIntToBytes(t *testing.T) {
 func TestIntToBytesAndBack(t *testing.T) {
 	type test struct {
 		b []byte
-		v int
+		v uint
 	}
 	tests := []test{
 		test{[]byte{0x0}, 0},
