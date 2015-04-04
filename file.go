@@ -334,7 +334,7 @@ func (f *File) saveUsingXrefTable() error {
 			}
 		case IndirectObject:
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
-			n, err = typed.WriteTo(file)
+			n, err = typed.writeTo(file)
 			if err != nil {
 				return maskErr(err)
 			}
@@ -442,7 +442,7 @@ func (f *File) saveUsingXrefTable() error {
 		trailer[Name("ID")] = f.ID
 	}
 
-	_, err = trailer.WriteTo(file)
+	_, err = trailer.writeTo(file)
 	if err != nil {
 		return maskErr(err)
 	}
@@ -488,7 +488,7 @@ func (f *File) saveUsingXrefStream() error {
 			}
 		case IndirectObject:
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
-			n, err = typed.WriteTo(file)
+			n, err = typed.writeTo(file)
 			if err != nil {
 				return maskErr(err)
 			}
@@ -630,7 +630,7 @@ func (f *File) saveUsingXrefStream() error {
 		return maskErr(err)
 	}
 
-	_, err = xrefstream.WriteTo(file)
+	_, err = xrefstream.writeTo(file)
 	if err != nil {
 		return maskErr(err)
 	}
