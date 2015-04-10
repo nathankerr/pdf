@@ -25,11 +25,11 @@ type Boolean bool
 
 // Integer objects represent mathematical integers.
 // - §7.3.3
-type Integer int
+type Integer int32
 
 // Real objects represent mathematical real numbers.
 // - §7.3.3
-type Real float64
+type Real float32
 
 // A String object consists of zero or more bytes.
 // - §7.3.4
