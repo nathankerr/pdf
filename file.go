@@ -6,6 +6,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
 	"io"
@@ -57,25 +58,25 @@ func Open(filename string) (*File, error) {
 	var err error
 	file.file, err = os.Open(filename)
 	if err != nil {
-		return nil, maskErr(err)
+		return nil, err
 	}
 
 	file.mmap, err = mmap.Map(file.file, mmap.RDONLY, 0)
 	if err != nil {
 		file.Close()
-		return nil, maskErr(err)
+		return nil, err
 	}
 
 	// check pdf file header
 	if !bytes.Equal(file.mmap[:7], []byte("%PDF-1.")) {
 		file.Close()
-		return nil, newErr("file does not have PDF header")
+		return nil, errors.New("file does not have PDF header")
 	}
 
 	err = file.loadReferences()
 	if err != nil {
 		file.Close()
-		return nil, maskErr(err)
+		return nil, err
 	}
 
 	return file, nil
@@ -94,7 +95,7 @@ func Create(filename string) (*File, error) {
 	// appends will not break things
 	f, err := os.Create(filename)
 	if err != nil {
-		return nil, maskErr(err)
+		return nil, err
 	}
 	defer f.Close()
 	f.Write([]byte("%PDF-1.7"))
@@ -108,7 +109,7 @@ func (f *File) Get(ref ObjectReference) Object {
 	// fmt.Println("getting: ", ref)
 	objectRaw, ok := f.objects[ref.ObjectNumber]
 	if !ok {
-		return Null{newErrf("%s not found", ref)}
+		return Null{fmt.Errorf("%s not found", ref)}
 	}
 
 	var object Object
@@ -117,21 +118,21 @@ func (f *File) Get(ref ObjectReference) Object {
 	case crossReference: // existing object
 		switch typed[0] {
 		case 0: // free entry
-			return Null{newErrf("%s is a free object", ref)}
+			return Null{fmt.Errorf("%s is a free object", ref)}
 		case 1: // normal
 			offset := typed[1] - 1
 			obj, _, err := parseIndirectObject(f.mmap[offset:])
 			if err != nil {
-				return Null{pushErrf(err, "Error parsing %s", ref)}
+				return Null{fmt.Errorf("Error parsing %s", ref)}
 			}
 
 			iobj, ok := obj.(IndirectObject)
 			if !ok {
-				return Null{newErrf("%v is not an indirect object", ref)}
+				return Null{fmt.Errorf("%v is not an indirect object", ref)}
 			}
 
 			if iobj.Object == nil {
-				return Null{newErrf("%v's object is nil", ref)}
+				return Null{fmt.Errorf("%v's object is nil", ref)}
 			}
 			object = iobj.Object
 		case 2: // in object stream
@@ -139,7 +140,7 @@ func (f *File) Get(ref ObjectReference) Object {
 			objectStreamRef := ObjectReference{ObjectNumber: typed[1]}
 			objectStream, ok := f.Get(objectStreamRef).(Stream)
 			if !ok {
-				return Null{newErrf("%v should be in object stream %v, but %v is not a stream", ref, objectStreamRef, objectStreamRef)}
+				return Null{fmt.Errorf("%v should be in object stream %v, but %v is not a stream", ref, objectStreamRef, objectStreamRef)}
 			}
 
 			// parse the index (object number and offset pairs)
@@ -147,14 +148,14 @@ func (f *File) Get(ref ObjectReference) Object {
 			N := int(objectStream.Dictionary[Name("N")].(Integer))
 			stream, err := objectStream.Decode()
 			if err != nil {
-				return Null{pushErrf(err, "could not decode %v", objectStreamRef)}
+				return Null{fmt.Errorf("could not decode %v", objectStreamRef)}
 			}
 
 			offset := 0
 			for i := 0; i < N*2; i++ {
 				obj, n, err := parseNumeric(stream[offset:])
 				if err != nil {
-					return Null{pushErrf(err, "unable to parse numeric %v", stream[offset:])}
+					return Null{fmt.Errorf("unable to parse numeric %v", stream[offset:])}
 				}
 
 				index = append(index, obj.(Integer))
@@ -182,7 +183,7 @@ func (f *File) Get(ref ObjectReference) Object {
 			first := int(objectStream.Dictionary[Name("First")].(Integer))
 			object, _, err = parseObject(stream[first+offset:])
 			if err != nil {
-				return Null{pushErrf(err, "unable to parse object %v", stream[first+offset:])}
+				return Null{fmt.Errorf("unable to parse object %v", stream[first+offset:])}
 			}
 		default:
 			panic(typed[0])
@@ -193,7 +194,7 @@ func (f *File) Get(ref ObjectReference) Object {
 		}
 		object = typed.Object
 	case freeObject: // newly freed object
-		return Null{newErrf("%v freed after pdf was loaded", ref)}
+		return Null{fmt.Errorf("%v freed after pdf was loaded", ref)}
 	default:
 		panic(fmt.Sprintf("unhandled type: %T", object))
 	}
@@ -260,7 +261,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 			if ref.GenerationNumber < minGenerationNumber {
 				// TODO: make better error
 				ref.GenerationNumber = minGenerationNumber
-				return ref, newErr("Generation number is too small...")
+				return ref, errors.New("Generation number is too small...")
 			}
 		}
 
@@ -284,7 +285,7 @@ func (f *File) Add(obj Object) (ObjectReference, error) {
 
 func writeLineBreakTo(w io.Writer) (int64, error) {
 	n, err := w.Write([]byte{'\n', '\n'})
-	return int64(n), maskErr(err)
+	return int64(n), err
 }
 
 // Save appends the objects that have been added to the File
@@ -301,12 +302,12 @@ func (f *File) Save() error {
 func (f *File) saveUsingXrefTable() error {
 	info, err := os.Stat(f.filename)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	file, err := os.OpenFile(f.filename, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 	defer file.Close()
 
@@ -314,7 +315,7 @@ func (f *File) saveUsingXrefTable() error {
 
 	n, err := writeLineBreakTo(file)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 	offset += n
 
@@ -336,13 +337,13 @@ func (f *File) saveUsingXrefTable() error {
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
 			n, err = typed.writeTo(file)
 			if err != nil {
-				return maskErr(err)
+				return err
 			}
 			offset += n
 
 			n, err = writeLineBreakTo(file)
 			if err != nil {
-				return maskErr(err)
+				return err
 			}
 			offset += n
 		case freeObject:
@@ -444,7 +445,7 @@ func (f *File) saveUsingXrefTable() error {
 
 	_, err = trailer.writeTo(file)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	fmt.Fprintf(file, "\nstartxref\n%d\n%%%%EOF", offset-1)
@@ -455,12 +456,12 @@ func (f *File) saveUsingXrefTable() error {
 func (f *File) saveUsingXrefStream() error {
 	info, err := os.Stat(f.filename)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	file, err := os.OpenFile(f.filename, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 	defer file.Close()
 
@@ -468,7 +469,7 @@ func (f *File) saveUsingXrefStream() error {
 
 	n, err := writeLineBreakTo(file)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 	offset += n
 
@@ -490,13 +491,13 @@ func (f *File) saveUsingXrefStream() error {
 			xrefs[Integer(i)] = crossReference{1, uint(offset - 1), typed.GenerationNumber}
 			n, err = typed.writeTo(file)
 			if err != nil {
-				return maskErr(err)
+				return err
 			}
 			offset += n
 
 			n, err = writeLineBreakTo(file)
 			if err != nil {
-				return maskErr(err)
+				return err
 			}
 			offset += n
 		case freeObject:
@@ -627,12 +628,12 @@ func (f *File) saveUsingXrefStream() error {
 	}
 	_, err = f.Add(xrefstream)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	_, err = xrefstream.writeTo(file)
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	fmt.Fprintf(file, "\nstartxref\n%d\n%%%%EOF", offset-1)
@@ -649,12 +650,12 @@ func (f *File) Close() error {
 
 	err := f.mmap.Unmap()
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	err = f.file.Close()
 	if err != nil {
-		return maskErr(err)
+		return err
 	}
 
 	return nil

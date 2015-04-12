@@ -502,7 +502,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	objectNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, maskErr(err)
+		return io, i, err
 	}
 	io.ObjectNumber = uint(objectNumber)
 
@@ -511,7 +511,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	generationNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, maskErr(err)
+		return io, i, err
 	}
 	io.GenerationNumber = uint(generationNumber)
 
@@ -519,7 +519,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	n, ok := match(slice[i:], "obj")
 	i += n
 	if !ok {
-		return io, i, newErr("could not find 'obj'")
+		return io, i, errors.New("could not find 'obj'")
 	}
 
 	// the object
@@ -527,7 +527,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	i += n
 	io.Object = object
 	if err != nil {
-		return io, i, maskErr(err)
+		return io, i, err
 	}
 
 	// stream objects might not have determinable lengths, and so cannot be fully parsed
@@ -541,7 +541,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	n, ok = match(slice[i:], "endobj")
 	i += n
 	if !ok {
-		return io, i, newErr("could not find 'endobj'")
+		return io, i, errors.New("could not find 'endobj'")
 	}
 
 	return io, i, nil
