@@ -29,9 +29,8 @@ type File struct {
 	// free object for newly freed objects
 	// map key is the object number
 	// make sure generation number is >= existing generation number when modifying
-	objects  map[uint]interface{}
-	nextFree uint // object number of next free object
-	size     uint // max object number + 1
+	objects map[uint]interface{}
+	size    uint // max object number + 1
 
 	prev Integer
 
