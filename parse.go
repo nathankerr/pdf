@@ -96,7 +96,8 @@ func parseObject(slice []byte) (Object, int, error) {
 				return object, start + n, errors.New("expected a Dictionary")
 			}
 
-			streamLengthInteger, ok := dict["Length"].(Integer)
+			var streamLengthInteger Integer
+			streamLengthInteger, ok = dict["Length"].(Integer)
 			if !ok {
 				object = Stream{
 					Dictionary: dict,
@@ -133,8 +134,9 @@ func nextToken(slice []byte) ([]byte, int) {
 	// §7.2.2 Table 2
 
 	var begin, end int
+	var ok bool
 
-	begin, ok := nextNonWhitespace(slice)
+	begin, ok = nextNonWhitespace(slice)
 	if !ok {
 		begin = 0
 	}
@@ -282,19 +284,23 @@ func parseDictionary(slice []byte) (Object, int, error) {
 		}
 
 		// get the key
-		name, n, err := parseName(slice[i:])
+		var name Object
+		var err error
+		name, n, err = parseName(slice[i:])
 		if err != nil {
 			return dict, i + n, err
 		}
 		i += n
 
-		key, ok := name.(Name)
+		var key Name
+		key, ok = name.(Name)
 		if !ok {
 			return dict, i, errors.New("unable to cast Name")
 		}
 
 		// get the value
-		value, n, err := parseObject(slice[i:])
+		var value Object
+		value, n, err = parseObject(slice[i:])
 		if err != nil {
 			return dict, i, err
 		}
@@ -472,7 +478,8 @@ func parseObjectReference(slice []byte) (Object, int, error) {
 	}
 	objref.ObjectNumber = uint(integer)
 
-	generationNumber, n, err := parseNumeric(slice[i:])
+	var generationNumber Object
+	generationNumber, n, err = parseNumeric(slice[i:])
 	i += n
 	if err != nil {
 		return objref, i, err
@@ -516,14 +523,16 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	io.GenerationNumber = uint(generationNumber)
 
 	// "obj"
-	n, ok := match(slice[i:], "obj")
+	var ok bool
+	n, ok = match(slice[i:], "obj")
 	i += n
 	if !ok {
 		return io, i, errors.New("could not find 'obj'")
 	}
 
 	// the object
-	object, n, err := parseObject(slice[i:])
+	var object Object
+	object, n, err = parseObject(slice[i:])
 	i += n
 	io.Object = object
 	if err != nil {

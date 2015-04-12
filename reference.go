@@ -317,7 +317,8 @@ func parseXrefBlock(slice []byte) (crossReferences, int) {
 		i += n
 
 		// type
-		entryType, n := nextToken(slice[i:])
+		var entryType []byte
+		entryType, n = nextToken(slice[i:])
 		i += n
 
 		var xref crossReference
