@@ -269,7 +269,10 @@ func nBytesForInt(value int) int {
 func intToBytes(value uint, size int) []byte {
 	b := &bytes.Buffer{}
 	v := uint64(value)
-	binary.Write(b, binary.BigEndian, v)
+	err := binary.Write(b, binary.BigEndian, v)
+	if err != nil {
+		panic(err)
+	}
 
 	bytesOfInt := b.Bytes()
 	return bytesOfInt[len(bytesOfInt)-size:]

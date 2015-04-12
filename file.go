@@ -63,19 +63,28 @@ func Open(filename string) (*File, error) {
 
 	file.mmap, err = mmap.Map(file.file, mmap.RDONLY, 0)
 	if err != nil {
-		file.Close()
+		err2 := file.Close()
+		if err2 != nil {
+			return nil, fmt.Errorf("%v %v", err, err2)
+		}
 		return nil, err
 	}
 
 	// check pdf file header
 	if !bytes.Equal(file.mmap[:7], []byte("%PDF-1.")) {
-		file.Close()
+		err = file.Close()
+		if err != nil {
+			return nil, errors.New("file does not have PDF header; " + err.Error())
+		}
 		return nil, errors.New("file does not have PDF header")
 	}
 
 	err = file.loadReferences()
 	if err != nil {
-		file.Close()
+		err2 := file.Close()
+		if err2 != nil {
+			return nil, fmt.Errorf("%v %v", err, err2)
+		}
 		return nil, err
 	}
 
@@ -97,8 +106,17 @@ func Create(filename string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	f.Write([]byte("%PDF-1.7"))
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	_, err = f.Write([]byte("%PDF-1.7"))
+	if err != nil {
+		return nil, err
+	}
 
 	return file, nil
 }
@@ -309,7 +327,12 @@ func (f *File) saveUsingXrefTable() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	offset := info.Size() + 1
 
@@ -463,7 +486,12 @@ func (f *File) saveUsingXrefStream() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	offset := info.Size() + 1
 
@@ -612,7 +640,10 @@ func (f *File) saveUsingXrefStream() error {
 		for _, objectNumber := range group {
 			xref := xrefs[Integer(objectNumber)]
 			for i := range xref {
-				stream.Write(intToBytes(xref[i], nBytes[i]))
+				_, err = stream.Write(intToBytes(xref[i], nBytes[i]))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
