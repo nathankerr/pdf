@@ -185,15 +185,6 @@ func nextNonWhitespace(slice []byte) (int, bool) {
 	return 0, false
 }
 
-func nextWhitespace(slice []byte) (int, bool) {
-	for i := 0; i < len(slice); i++ {
-		if isWhitespace(slice[i]) {
-			return i, true
-		}
-	}
-	return 0, false
-}
-
 func match(slice []byte, toMatch string) (int, bool) {
 	token, n := nextToken(slice)
 
