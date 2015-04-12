@@ -1,15 +1,13 @@
 package pdf
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 )
 
 // WriteTo serializes the Boolean according to the rules in
 // §7.3.2
 func (b Boolean) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	if b {
 		buf.WriteString("true")
@@ -23,9 +21,9 @@ func (b Boolean) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Integer according to the rules in
 // §7.3.3
 func (i Integer) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
-	fmt.Fprintf(buf, "%d", int(i))
+	buf.Printf("%d", int(i))
 
 	return buf.WriteTo(w)
 }
@@ -33,9 +31,9 @@ func (i Integer) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Real according to the rules in
 // §7.3.3
 func (r Real) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
-	fmt.Fprintf(buf, "%v", float64(r))
+	buf.Printf("%v", float64(r))
 
 	return buf.WriteTo(w)
 }
@@ -43,7 +41,7 @@ func (r Real) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the String according to the rules in
 // §7.3.4
 func (s String) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	buf.WriteByte('(')
 	for _, b := range []byte(s) {
@@ -64,9 +62,9 @@ func (s String) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Name according to the rules in
 // §7.3.5
 func (n Name) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
-	fmt.Fprintf(buf, "/%s", n)
+	buf.Printf("/%s", n)
 
 	return buf.WriteTo(w)
 }
@@ -74,11 +72,14 @@ func (n Name) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Array according to the rules in
 // §7.3.6
 func (a Array) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	buf.WriteByte('[')
 	for _, obj := range a {
-		obj.writeTo(buf)
+		n, err := obj.writeTo(buf)
+		if err != nil {
+			return n, err
+		}
 		buf.WriteByte(' ')
 	}
 	if len(a) != 0 {
@@ -92,13 +93,19 @@ func (a Array) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Dictionary according to the rules in
 // §7.3.6
 func (d Dictionary) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	buf.WriteString("<<")
 	for name, obj := range d {
-		name.writeTo(buf)
+		n, err := name.writeTo(buf)
+		if err != nil {
+			return n, err
+		}
 		buf.WriteByte(' ')
-		obj.writeTo(buf)
+		n, err = obj.writeTo(buf)
+		if err != nil {
+			return n, err
+		}
 	}
 	buf.WriteString(">>")
 
@@ -108,7 +115,7 @@ func (d Dictionary) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the Stream according to the rules in
 // §7.3.8
 func (s Stream) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	// update the dictionary
 	if s.Dictionary == nil {
@@ -116,11 +123,17 @@ func (s Stream) writeTo(w io.Writer) (int64, error) {
 	}
 	s.Dictionary[Name("Length")] = Integer(len(s.Stream))
 
-	s.Dictionary.writeTo(buf)
+	n, err := s.Dictionary.writeTo(buf)
+	if err != nil {
+		return n, err
+	}
 
-	fmt.Fprintf(buf, "\nstream\n")
-	buf.Write(s.Stream)
-	fmt.Fprintf(buf, "\nendstream")
+	buf.Printf("\nstream\n")
+	nint, err := buf.Write(s.Stream)
+	if err != nil {
+		return int64(nint), err
+	}
+	buf.Printf("\nendstream")
 
 	return buf.WriteTo(w)
 }
@@ -128,7 +141,7 @@ func (s Stream) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes Null according to the rules in
 // §7.3.9
 func (null Null) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
 	buf.WriteString("null")
 
@@ -138,9 +151,9 @@ func (null Null) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the ObjectReference according to the rules in
 // §7.3.10
 func (objref ObjectReference) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
+	buf := &buffer{}
 
-	fmt.Fprintf(buf, "%d %d R", objref.ObjectNumber, objref.GenerationNumber)
+	buf.Printf("%d %d R", objref.ObjectNumber, objref.GenerationNumber)
 
 	return buf.WriteTo(w)
 }
@@ -148,9 +161,14 @@ func (objref ObjectReference) writeTo(w io.Writer) (int64, error) {
 // WriteTo serializes the IndirectObject according to the rules in
 // §7.3.10
 func (inobj IndirectObject) writeTo(w io.Writer) (int64, error) {
-	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "%d %d obj\n", inobj.ObjectNumber, inobj.GenerationNumber)
-	inobj.Object.writeTo(buf)
-	fmt.Fprintf(buf, "\nendobj")
+	buf := &buffer{}
+	buf.Printf("%d %d obj\n", inobj.ObjectNumber, inobj.GenerationNumber)
+
+	n, err := inobj.Object.writeTo(buf)
+	if err != nil {
+		return n, err
+	}
+
+	buf.Printf("\nendobj")
 	return buf.WriteTo(w)
 }
