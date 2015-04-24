@@ -107,13 +107,13 @@ func (file *File) parseReferences(xrefOffset int) (map[uint]interface{}, Diction
 		// indirect object and therefore a cross-reference stream §7.5.8
 		xrstreamAsObject, _, err := parseIndirectObject(file.mmap[xrefOffset:])
 		if err != nil {
-			return refs, trailer, err
+			return nil, nil, err
 		}
 		xrstream := xrstreamAsObject.(IndirectObject).Object.(Stream)
 
 		stream, err := xrstream.Decode()
 		if err != nil {
-			return refs, trailer, err
+			return nil, nil, err
 		}
 
 		trailer = xrstream.Dictionary

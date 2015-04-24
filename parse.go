@@ -491,17 +491,17 @@ func parseObjectReference(slice []byte) (Object, int, error) {
 }
 
 func parseIndirectObject(slice []byte) (Object, int, error) {
-	var io IndirectObject
 	i := 0
-	var err error
 
 	// Object Number
 	token, n := nextToken(slice[i:])
 	objectNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, err
+		return nil, i, err
 	}
+
+	var io IndirectObject
 	io.ObjectNumber = uint(objectNumber)
 
 	// Generation Number
@@ -509,7 +509,7 @@ func parseIndirectObject(slice []byte) (Object, int, error) {
 	generationNumber, err := strconv.ParseUint(string(token), 10, 64)
 	i += n
 	if err != nil {
-		return io, i, err
+		return nil, i, err
 	}
 	io.GenerationNumber = uint(generationNumber)
 

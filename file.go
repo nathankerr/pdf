@@ -71,7 +71,7 @@ func Open(filename string) (*File, error) {
 
 	// check pdf file header
 	if !bytes.Equal(file.mmap[:7], []byte("%PDF-1.")) {
-		err = file.Close()
+		err := file.Close()
 		if err != nil {
 			return nil, errors.New("file does not have PDF header; " + err.Error())
 		}
