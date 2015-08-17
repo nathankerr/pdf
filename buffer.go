@@ -13,6 +13,10 @@ type buffer struct {
 }
 
 func (b *buffer) WriteTo(w io.Writer) (int64, error) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return 0, b.err
 	}
@@ -21,6 +25,10 @@ func (b *buffer) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (b *buffer) WriteString(s string) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return
 	}
@@ -29,6 +37,10 @@ func (b *buffer) WriteString(s string) {
 }
 
 func (b *buffer) Write(p []byte) (int, error) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return 0, b.err
 	}
@@ -39,6 +51,10 @@ func (b *buffer) Write(p []byte) (int, error) {
 }
 
 func (b *buffer) Printf(format string, a ...interface{}) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return
 	}
@@ -47,6 +63,10 @@ func (b *buffer) Printf(format string, a ...interface{}) {
 }
 
 func (b *buffer) WriteByte(c byte) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return
 	}
@@ -55,6 +75,10 @@ func (b *buffer) WriteByte(c byte) {
 }
 
 func (b *buffer) Truncate(n int) {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	if b.err != nil {
 		return
 	}
@@ -63,5 +87,9 @@ func (b *buffer) Truncate(n int) {
 }
 
 func (b *buffer) Len() int {
+	if b.b == nil {
+		b.b = &bytes.Buffer{}
+	}
+
 	return b.b.Len()
 }
